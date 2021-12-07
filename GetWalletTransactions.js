@@ -32,28 +32,22 @@
 
 // Private variables
 var ckTools = require('./ckTools');
-var fromExponential = require('from-exponential');
 
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
-const maxAccountsToShow = 10; // or max with Number.MAX_SAFE_INTEGER
-const minBalance = 200;
+const account = "rhJYdAAiZPJpztnu13pHAATi4gsEi3Rf28"; // walletId
+const oldest = Date.parse('01 Dec 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods
-async function tokenRichList() {
+async function getWalletTransactions() {
 
     let client = await ckTools.getClientAsync();
-    let trustLines = await ckTools.getAllTrustLinesAsync(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
+    let walletTransactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
 
-    trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
-    trustLines = trustLines.sort((a, b) => b.balance - a.balance);
-
-    trustLines.splice(0, maxAccountsToShow).forEach((trustline) => {
-        console.log(`Wallet:  ${trustline.account} - Balance: ${trustline.balance}`)
+    walletTransactions.transactions.forEach((tx) => {
+        console.log(`Tx:  ${tx.tx.hash} - TransactionType: ${tx.tx.TransactionType}`)
     });
 
     process.exit(1);
 }
 
 // Init
-tokenRichList();
+getWalletTransactions();

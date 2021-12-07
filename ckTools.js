@@ -30,67 +30,20 @@
 //
 //
 
-// Private variables
+// Private variables - Dont change
 const xrpl = require('xrpl');
 const fromExponential = require('from-exponential');
+const rippleTimeOffSet = 946684800;
+const maxDate = new Date(8640000000000000);
+const minDate = new Date(-8640000000000000);;
+
+// Private variables - customise as required
 const upperDecimalLimit = 0.99;
 const lowerDecimalLimit = 0.001;
 
 // Public methods
-var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance = {currencyId, amount}) {
-
-  let useBalanceOk = checkMinBalance(minBalance);
-
-  let getTrustLines = {
-    "command": "account_lines",
-    "account": issuer,
-    "ledger_index": "validated",
-    "limit": limit
-  };
-
-  let trustLines = [];
-  await processAllMarkers(client, getTrustLines, (batch) => {
-
-    if (!useBalanceOk) {
-      trustLines = trustLines.concat(batch.result.lines)
-    }
-    else {
-      trustLines = trustLines.concat(batch.result.lines.filter(
-        (line) => isBalanceEnough(line, minBalance.amount, minBalance.currencyId)
-      ));
-    }
-
-  });
-
-  return trustLines;
-
-}
 var isBalanceEnough = function(line, requireBalance, currencyId)  {
   return toPositiveBalance(line.balance) >= requireBalance && line.currency === currencyId;
-}
-var processAllMarkers = async function(client, request, perBatch) {
-
-  let scan = true;
-  let marker = null;
-  let logLine = `Command: ${request.command} -`;
-  while(scan) {
-
-    if (marker)
-      request.marker = marker;
-
-    let response = await client.request(request);
-    scan = (response.result.marker != null);
-
-    perBatch(response);
-
-    if (scan) {
-      marker = response.result.marker;
-      console.log(`${logLine} Processing next batch - ${marker}`)
-    } else
-      console.log(`${logLine} Finished processing batches`)
-
-  }
-
 }
 var toPositiveBalance = function(balance) {
 
@@ -115,6 +68,165 @@ var toPositiveBalance = function(balance) {
   return parseFloat(positiveBalance);
 
 }
+var getDateTimeFromRippleTime = function(rippleTime) {
+
+  return new Date((rippleTimeOffSet + rippleTime) * 1000);
+
+}
+
+var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance = {currencyId, amount}) {
+
+  let useBalanceOk = checkMinBalance(minBalance);
+
+  let getTrustLines = {
+    "command": "account_lines",
+    "account": issuer,
+    "ledger_index": "validated",
+    "limit": limit
+  };
+
+  let trustLines = [];
+  await processAllMarkersAsync(client, getTrustLines, (batch) => {
+
+    if (!useBalanceOk) {
+      trustLines = trustLines.concat(batch.result.lines)
+    }
+    else {
+      trustLines = trustLines.concat(batch.result.lines.filter(
+        (line) => isBalanceEnough(line, minBalance.amount, minBalance.currencyId)
+      ));
+    }
+
+    return true;
+
+  });
+
+  return trustLines;
+
+}
+var processAllMarkersAsync = async function(client, request, perBatch) {
+
+  let scan = true;
+  let marker = null;
+  let logLine = `Command: ${request.command} -`;
+  while(scan) {
+
+    if (marker)
+      request.marker = marker;
+
+    let response = await client.request(request);
+    scan = (response.result.marker != null);
+
+    var keepScanning = perBatch(response);
+
+    if (keepScanning && scan) {
+      marker = response.result.marker;
+      console.log(`${logLine} Processing next batch - ${getCommentForScanMarker(marker)}`)
+    } else {
+      scan = false;
+      console.log(`${logLine} Finished processing batches`);
+    }  
+  }
+
+}
+var getWalletTransactionsAsync = async function (client, account, oldest) {
+
+  let request = {
+    "command": "account_tx",
+    "account": account,
+    "ledger_index_min": -1,
+    "ledger_index_max": -1,
+    "binary": false,
+    "forward": false
+  }
+  let walletTransactions = [];
+  let foundEnd
+
+  await processAllMarkersAsync(client, request, (batch) => {
+
+    let txs = batch.result.transactions;
+
+    if (!oldest) 
+    {
+      walletTransactions.push(txs);
+      return true;
+    }
+
+    let foundEnd = false;
+    for (let tx of txs) {
+      let txDate = getDateTimeFromRippleTime(tx.tx.date);
+      if (txDate >= oldest) {
+        walletTransactions.push(tx);
+      }
+      else {
+        foundEnd = true;
+        break;
+      }
+    }
+
+    return !foundEnd;
+
+  });
+
+  return {
+    account : account,
+    transactions : walletTransactions
+  }
+
+}
+var getWalletTrustLineInfoAsync = async function(account, transactions, issuer, currencyId) {
+
+    let firstSet = maxDate;
+    let firstRemoved = maxDate;
+    let lastSet = minDate;
+    let lastRemoved = minDate;
+
+    let trustLinesSet = [];
+    
+    transactions.forEach((tx) => {
+        
+        if(tx.tx.TransactionType === "TrustSet" && tx.validated) {
+            if (tx.tx.LimitAmount.issuer == issuer && tx.tx.LimitAmount.currency == currencyId) {
+
+                let wasAdded = false;
+
+                for(let node of tx.meta.AffectedNodes) {
+                    if (node.hasOwnProperty("CreatedNode")) {
+                        wasAdded = true;
+                        break;     
+                    }
+                }
+
+                let turstLineDate = getDateTimeFromRippleTime(tx.tx.date);
+      
+                if (wasAdded) {
+                    if (turstLineDate < firstSet) firstSet = turstLineDate;
+                    if (turstLineDate > lastSet) lastSet = turstLineDate
+                } else {
+                    if (turstLineDate < firstRemoved) firstRemoved = turstLineDate;
+                    if (turstLineDate > lastRemoved) lastRemoved = turstLineDate
+                }
+                
+                trustLinesSet.push({
+                    "Added" : wasAdded,
+                    "DateTime" : turstLineDate
+                });
+
+            }
+        }
+
+    });
+
+    return {
+        account : account,
+        firstSet : firstSet != maxDate ? firstSet : null,
+        lastSet : lastSet != minDate ? lastSet : null,
+        firstRemoved :  firstRemoved != maxDate ? firstRemoved : null,
+        lastRemoved : lastRemoved != minDate ? lastRemoved : null,
+        history : trustLinesSet
+    };
+
+}
 
 // Private methods
 function checkMinBalance(minBalance = {currencyId, amount}) {
@@ -135,18 +247,26 @@ function checkMinBalance(minBalance = {currencyId, amount}) {
   return false;
 
 }
+function getCommentForScanMarker(marker) {
+  return marker instanceof Object ? `ledger: ${marker.ledger}, seq: ${marker.seq}` : marker;
+}
 
 // Public module
 module.exports = {
   xrpl: xrpl,
+  maxDate: maxDate,
+  minDate: minDate,
   getClientAsync: async function() {
     const client = new xrpl.Client('wss://xrplcluster.com');
     await client.connect();
     return client;
   },
-  getAllTrustLines : getAllTrustLines,
+  getAllTrustLinesAsync : getAllTrustLinesAsync,
   isBalanceEnough : isBalanceEnough,
-  processAllMarkers : processAllMarkers,
-  toPositiveBalance : toPositiveBalance
+  processAllMarkersAsync : processAllMarkersAsync,
+  toPositiveBalance : toPositiveBalance,
+  getWalletTransactionsAsync : getWalletTransactionsAsync,
+  getDateTimeFromRippleTime: getDateTimeFromRippleTime,
+  getWalletTrustLineInfoAsync: getWalletTrustLineInfoAsync
 };
 
