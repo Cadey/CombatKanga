@@ -105,7 +105,7 @@ var toPositiveBalance = function(balance) {
 
   // Round off silly numbers - See upperDecimalLimit & lowerDecimalLimit variables
   if (decimal.length > 1) {
-    var decimalNum = fromExponential(parseFloat(`0.${decimal[1]}`));
+    let decimalNum = fromExponential(parseFloat(`0.${decimal[1]}`));
     if (decimalNum >= upperDecimalLimit)
       positiveBalance = parseInt(decimal[0]) + 1;
     else if (decimalNum <= lowerDecimalLimit)
@@ -121,7 +121,7 @@ function checkMinBalance(minBalance = {currencyId, amount}) {
 
   if (minBalance)  {
 
-    var amount = parseFloat(minBalance.amount);
+    let amount = parseFloat(minBalance.amount);
     if (isNaN(amount))
       throw 'minBalance.amount has to be a valid number';
 

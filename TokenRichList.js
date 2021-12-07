@@ -42,8 +42,8 @@ const minBalance = 200;
 // Private methods
 async function tokenRichList() {
 
-    var client = await ckTools.getClientAsync();
-    var trustLines = await ckTools.getAllTrustLines(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
+    let client = await ckTools.getClientAsync();
+    let trustLines = await ckTools.getAllTrustLines(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
 
     trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
     trustLines = trustLines.sort((a, b) => b.balance - a.balance);
