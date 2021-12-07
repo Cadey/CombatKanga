@@ -31,8 +31,27 @@
 //
 
 const xrpl = require('xrpl');
+const mathjs = require('mathjs');
+const fromExponential = require('from-exponential');
+const upperDecimalLimit = 0.99;
+const lowerDecimalLimit = 0.001;
 
-var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER ,minBalance = null) {
+var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance = {currencyId, amount}) {
+
+
+  let minBalanceOk = false;
+  if (minBalance)  {
+
+    var amount = parseFloat(minBalance.amount);
+    if (isNaN(amount))
+      throw 'minBalance.amount has to be a valid number';
+
+    if (!minBalance.currencyId || minBalance.currencyId === "")
+      throw 'minBalance.currencyId is required to check the balance';
+
+    minBalanceOk = true;
+
+  }
 
   let getTrustLines = {
     "command": "account_lines",
@@ -44,19 +63,12 @@ var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_IN
   let trustLines = [];
   await processAllMarkers(client, getTrustLines, (batch) => {
 
-    if (!minBalance || minBalance == 0) {
+    if (!minBalanceOk) {
       trustLines = trustLines.concat(batch.result.lines)
     }
     else {
       trustLines = trustLines.concat(batch.result.lines.filter(
-        (line) => {
-          
-          if (isOptingOut(line.account))
-            return false;
-    
-          return isBalanceEnough(line, minBalance);
-    
-        }
+        (line) => isBalanceEnough(line, minBalance.amount, minBalance.currencyId)
       ));
     }
 
@@ -65,14 +77,14 @@ var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_IN
   return trustLines;
 
 }
-var isBalanceEnough = function(line, requireBalance)  {
-  return (parseInt(line.balance) * -1) >= requireBalance && line.currency === currency_xKangaMK1;
+var isBalanceEnough = function(line, requireBalance, currencyId)  {
+  return toPositiveBalance(line.balance) >= requireBalance && line.currency === currencyId;
 }
 var processAllMarkers = async function(client, request, perBatch) {
 
   let scan = true;
   let marker = null;
-  let logLine = `$Command: ${request.command} -`;
+  let logLine = `Command: ${request.command} -`;
   while(scan) {
 
     if (marker)
@@ -92,20 +104,27 @@ var processAllMarkers = async function(client, request, perBatch) {
   }
 
 }
-var toPositiveBalance = function(blanace) {
+var toPositiveBalance = function(balance) {
 
-  if (blanace >= 0)
-    return blanace;
+  if (balance >= 0)
+    return balance;
 
-  let tempBalance = blanace * -1;
+  let positiveBalance = balance * -1;
 
-  let decimal = tempBalance.toString().split(".");
+  positiveBalance = fromExponential(parseFloat(positiveBalance));
+
+  let decimal = positiveBalance.toString().split(".");
+
+  // Round off silly numbers - See upperDecimalLimit & lowerDecimalLimit variables
   if (decimal.length > 1) {
-    if (parseInt(decimal[1]) >= 99)
-      tempBalance = parseInt(decimal[0]) + 1;
+    var decimalNum = fromExponential(parseFloat(`0.${decimal[1]}`));
+    if (decimalNum >= upperDecimalLimit)
+      positiveBalance = parseInt(decimal[0]) + 1;
+    else if (decimalNum <= lowerDecimalLimit)
+      positiveBalance = parseInt(decimal[0]);
   }
 
-  return tempBalance;
+  return parseFloat(positiveBalance);
 
 }
 

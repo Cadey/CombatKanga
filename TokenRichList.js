@@ -31,36 +31,25 @@
 //
 
 var ckTools = require('./ckTools');
+var fromExponential = require('from-exponential');
 
 const currencyId = "784B616E67614D4B310000000000000000000000";
 const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
-const showTotal = 20;
+const showTotal = 10;
 
 async function tokenRichList() {
 
     var client = await ckTools.getClientAsync();
-    var trustLines = await ckTools.getAllTrustLines(client, issuer)
+    var trustLines = await ckTools.getAllTrustLines(client, issuer, Number.MAX_SAFE_INTEGER, { amount: 10, currencyId: currencyId});
 
-    trustLines.forEach((trustline) => {
-        trustline.balance = ckTools.toPositiveBalance(trustline.balance);
-    });
-
-    trustLines = trustLines.sort((a, b) => {
-
-        var aBalance = a.balance;
-        var bBalance = b.balance;
-
-        if (aBalance > bBalance) return 1;
-        if (aBalance < bBalance) return -1;
-
-        return 0;
-
-    }).reverse();
+    trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
+    trustLines = trustLines.sort((a, b) => b.balance - a.balance);
 
     trustLines.splice(0, showTotal).forEach((trustline) => {
         console.log(`Wallet:  ${trustline.account} - Balance: ${trustline.balance}`)
-    })
+    });
 
+    process.exit(1);
 }
 
 tokenRichList();
