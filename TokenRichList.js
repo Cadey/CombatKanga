@@ -30,6 +30,7 @@
 //
 //
 
+// Private variables
 var ckTools = require('./ckTools');
 var fromExponential = require('from-exponential');
 
@@ -38,6 +39,7 @@ const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
 const maxAccountsToShow = 10; // or max with Number.MAX_SAFE_INTEGER
 const minBalance = 200;
 
+// Private methods
 async function tokenRichList() {
 
     var client = await ckTools.getClientAsync();
@@ -53,4 +55,5 @@ async function tokenRichList() {
     process.exit(1);
 }
 
+// Init
 tokenRichList();

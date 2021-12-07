@@ -30,27 +30,16 @@
 //
 //
 
+// Private variables
 const xrpl = require('xrpl');
 const fromExponential = require('from-exponential');
 const upperDecimalLimit = 0.99;
 const lowerDecimalLimit = 0.001;
 
+// Public methods
 var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance = {currencyId, amount}) {
 
-
-  let minBalanceOk = false;
-  if (minBalance)  {
-
-    var amount = parseFloat(minBalance.amount);
-    if (isNaN(amount))
-      throw 'minBalance.amount has to be a valid number';
-
-    if (!minBalance.currencyId || minBalance.currencyId === "")
-      throw 'minBalance.currencyId is required to check the balance';
-
-    minBalanceOk = true;
-
-  }
+  let useBalanceOk = checkMinBalance(minBalance);
 
   let getTrustLines = {
     "command": "account_lines",
@@ -62,7 +51,7 @@ var getAllTrustLines = async function(client, issuer, limit = Number.MAX_SAFE_IN
   let trustLines = [];
   await processAllMarkers(client, getTrustLines, (batch) => {
 
-    if (!minBalanceOk) {
+    if (!useBalanceOk) {
       trustLines = trustLines.concat(batch.result.lines)
     }
     else {
@@ -127,6 +116,27 @@ var toPositiveBalance = function(balance) {
 
 }
 
+// Private methods
+function checkMinBalance(minBalance = {currencyId, amount}) {
+
+  if (minBalance)  {
+
+    var amount = parseFloat(minBalance.amount);
+    if (isNaN(amount))
+      throw 'minBalance.amount has to be a valid number';
+
+    if (!minBalance.currencyId || minBalance.currencyId === "")
+      throw 'minBalance.currencyId is required to check the balance';
+
+    return true;
+
+  }
+
+  return false;
+
+}
+
+// Public module
 module.exports = {
   xrpl: xrpl,
   getClientAsync: async function() {
