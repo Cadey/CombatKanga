@@ -31,7 +31,6 @@
 //
 
 const xrpl = require('xrpl');
-const mathjs = require('mathjs');
 const fromExponential = require('from-exponential');
 const upperDecimalLimit = 0.99;
 const lowerDecimalLimit = 0.001;
