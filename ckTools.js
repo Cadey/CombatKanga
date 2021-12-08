@@ -197,19 +197,19 @@ var getWalletTrustLineInfoAsync = async function(account, transactions, issuer, 
                     }
                 }
 
-                let turstLineDate = getDateTimeFromRippleTime(tx.tx.date);
+                let trustLineDate = getDateTimeFromRippleTime(tx.tx.date);
       
                 if (wasAdded) {
-                    if (turstLineDate < firstSet) firstSet = turstLineDate;
-                    if (turstLineDate > lastSet) lastSet = turstLineDate
+                    if (trustLineDate < firstSet) firstSet = trustLineDate;
+                    if (trustLineDate > lastSet) lastSet = trustLineDate
                 } else {
-                    if (turstLineDate < firstRemoved) firstRemoved = turstLineDate;
-                    if (turstLineDate > lastRemoved) lastRemoved = turstLineDate
+                    if (trustLineDate < firstRemoved) firstRemoved = trustLineDate;
+                    if (trustLineDate > lastRemoved) lastRemoved = trustLineDate
                 }
                 
                 trustLinesSet.push({
                     "Added" : wasAdded,
-                    "DateTime" : turstLineDate
+                    "DateTime" : trustLineDate
                 });
 
             }
