@@ -45,7 +45,7 @@ async function GetWalletTradingStats() {
     let walletTransactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
 
     let issuer = balances.filter(e => e.currencyId == currencyId);
-    let stats = ckTools.getWalletTradingStats(account, walletTransactions, currencyId, issuer[0]?.issuer ?? null, issuer[0]?.balance ?? null);
+    let stats = ckTools.getWalletTradingStats(account, walletTransactions, currencyId);
 
     process.exit(1);
 }

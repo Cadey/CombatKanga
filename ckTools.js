@@ -99,12 +99,15 @@ var getWalletTradingStats = function(account, accountTx, currencyId, issuer, cur
 
     let tx = transaction.tx;
 
-    // Discard anythign which isnt a turstline, payment or offer
+    // Discard anything which isnt a trustline, payment or offer
     if(!(tx.TransactionType === tt_trustSet || tx.TransactionType === tt_payment || tx.TransactionType === tt_offerCreate))
       return;
 
     // Get the oldest trust line date.
-    if(issuer != null && tx.TransactionType === tt_trustSet) {
+    if(tx.TransactionType === tt_trustSet) {
+
+      if (!issuer)
+        return;
 
       let trustLineDate = getTrustLineDate(transaction.meta.AffectedNodes, tx.date, issuer);
 
@@ -148,6 +151,7 @@ var getWalletTradingStats = function(account, accountTx, currencyId, issuer, cur
       currency: currencyId,
       symbol: getCurrencySymbol(currencyId)
     },
+    runningBalance : runningBalance,
     balancePeak : balancePeak,
     totalPurchased : totalPurchased,
     totalSold : totalSold,
