@@ -20,7 +20,7 @@ For now a bit of a dumping ground for utility functions but will be cleaned up a
 Simply change the `currencyId` and `issuer` to your tokens currency and issuer wallet address to see yoiur tokens rich list!
 
 **Usage**
-> `currencyId`: *Your currency Id*
+> `currencyId`: *Your currency Id (Hex string) - E.g : 784B616E67614D4B310000000000000000000000*
 >
 > `issuer`: *Your curreny issuer wallet Id*
 > 
@@ -33,7 +33,7 @@ Simply change the `currencyId` and `issuer` to your tokens currency and issuer w
 Pulls back all the times a trust line has been added and removed from a wallet
 
 **Usage**
-> `currencyId`: *Your currency Id*
+> `currencyId`: *Your currency Id (Hex string) - E.g : 784B616E67614D4B310000000000000000000000*
 >
 > `issuer`: *Your curreny issuer wallet Id*
 > 
@@ -49,3 +49,14 @@ Gets all the transactions which have been made.
 > `account`: *Account / Wallet Id to lookup*
 > 
 > `oldest`: *How far to look back on the ledger*
+#
+#### GetWalletTradingStats.js
+Generate trading (Buying/Selling, sending and receiving) of tokens from a list of transactions.
+
+**Usage**
+> `account`: *Account / Wallet Id to lookup*
+> 
+> `oldest`: *How far to look back on the ledger*
+> > 
+> `currencyId`: *the currency you want to check (Hex string) - E.g : 784B616E67614D4B310000000000000000000000*
+
