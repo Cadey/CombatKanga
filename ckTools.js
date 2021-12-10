@@ -88,7 +88,7 @@ var getWalletTradingStats = function(account, accountTx, currencyId, issuer, cur
   let runningBalance = 0;
   let totalReceived = 0;
   let totalSent = 0;
-  let firstTrustLineSet = new Date(8640000000000000);
+  let firstTrustLineSet = maxDate;
 
   accountTx.transactions.reverse();
   accountTx.transactions.forEach(function (transaction) {
