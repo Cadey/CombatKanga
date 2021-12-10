@@ -33,22 +33,22 @@
 // Private variables
 var ckTools = require('./ckTools');
 
-
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
 const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
-const oldest = Date.parse('01 Oct 2021 00:00:00 UTC'); // How far to look back
+const oldest = Date.parse('01 Sep 2021 00:00:00 UTC'); // How far to look back
+const currencyId = "784B616E67614D4B310000000000000000000000";
 
 // Private methods
-async function GetWalletTrustLineInfo() {
+async function GetWalletTradingStats() {
 
     let client = await ckTools.getClientAsync();
-    let transactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
+    let balances = await ckTools.getAccountLinessAsync(client, account);
+    let walletTransactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
 
-    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, currencyId);
+    let issuer = balances.filter(e => e.currencyId == currencyId);
+    let stats = ckTools.getWalletTradingStats(account, walletTransactions, currencyId, issuer[0]?.issuer ?? null, issuer[0]?.balance ?? null);
 
     process.exit(1);
 }
 
 // Init
-GetWalletTrustLineInfo();
+GetWalletTradingStats();

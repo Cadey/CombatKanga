@@ -37,6 +37,12 @@ const rippleTimeOffSet = 946684800;
 const maxDate = new Date(8640000000000000);
 const minDate = new Date(-8640000000000000);;
 
+const tt_trustSet = "TrustSet";
+const tt_payment = "Payment";
+const tt_offerCreate = "OfferCreate";
+
+const lt_rippleState = "RippleState";
+
 // Private variables - customise as required
 const upperDecimalLimit = 0.99;
 const lowerDecimalLimit = 0.001;
@@ -52,13 +58,13 @@ var toPositiveBalance = function(balance) {
 
   let positiveBalance = balance * -1;
 
-  positiveBalance = fromExponential(parseFloat(positiveBalance));
+  positiveBalance = parseXrpAmountToFloat(positiveBalance);
 
   let decimal = positiveBalance.toString().split(".");
 
   // Round off silly numbers - See upperDecimalLimit & lowerDecimalLimit variables
   if (decimal.length > 1) {
-    let decimalNum = fromExponential(parseFloat(`0.${decimal[1]}`));
+    let decimalNum = parseXrpAmountToFloat(parseFloat(`0.${decimal[1]}`));
     if (decimalNum >= upperDecimalLimit)
       positiveBalance = parseInt(decimal[0]) + 1;
     else if (decimalNum <= lowerDecimalLimit)
@@ -68,9 +74,145 @@ var toPositiveBalance = function(balance) {
   return parseFloat(positiveBalance);
 
 }
+var parseXrpAmountToFloat = function(amount) { return parseFloat(fromExponential(parseFloat(amount))); }
 var getDateTimeFromRippleTime = function(rippleTime) {
 
   return new Date((rippleTimeOffSet + rippleTime) * 1000);
+
+}
+var getWalletTradingStats = function(account, accountTx, currencyId, issuer, currentBalance) {
+
+  let totalPurchased = 0;
+  let totalSold = 0;
+  let balancePeak = 0;
+  let runningBalance = 0;
+  let totalReceived = 0;
+  let totalSent = 0;
+  let firstTrustLineSet = new Date(8640000000000000);
+
+  accountTx.transactions.reverse();
+  accountTx.transactions.forEach(function (transaction) {
+
+    // Discard non validated transactions
+    if(!transaction.validated)
+      return;
+
+    let tx = transaction.tx;
+
+    // Discard anythign which isnt a turstline, payment or offer
+    if(!(tx.TransactionType === tt_trustSet || tx.TransactionType === tt_payment || tx.TransactionType === tt_offerCreate))
+      return;
+
+    // Get the oldest trust line date.
+    if(issuer != null && tx.TransactionType === tt_trustSet) {
+
+      let trustLineDate = getTrustLineDate(transaction.meta.AffectedNodes, tx.date, issuer);
+
+      if (trustLineDate < firstTrustLineSet)
+        firstTrustLineSet = trustLineDate;
+
+      return;
+
+    }
+
+    // Discard transactions on other currency pairs
+    if (tx.TransactionType === tt_payment && tx.Amount.currency != currencyId)
+      return;
+
+    if (tx.TransactionType === tt_offerCreate && !(tx.TakerPays.currency === currencyId || tx.TakerGets.currency === currencyId))
+      return;
+
+    // Process the balance change
+    let change = getTransactionBalanceChange(transaction.meta.AffectedNodes, account);
+
+    if (tx.TransactionType === tt_payment) {
+      totalReceived += change.totalAdded;
+      totalSent += change.totalRemoved * -1;
+    }
+    else
+    {
+      totalPurchased += change.totalAdded;
+      totalSold += change.totalRemoved * -1;
+    }
+    
+    runningBalance += change.totalAdded + change.totalRemoved;
+
+    if (runningBalance > balancePeak)
+      balancePeak = runningBalance;
+
+  });
+
+  var response = {
+    account : account,
+    currency : {
+      currency: currencyId,
+      symbol: getCurrencySymbol(currencyId)
+    },
+    balancePeak : balancePeak,
+    totalPurchased : totalPurchased,
+    totalSold : totalSold,
+    totalReceived : totalReceived,
+    totalSent: totalSent,
+    firstTrustLineSet : firstTrustLineSet
+  };
+
+  if (currentBalance)
+    response["currentBalance"] = (currentBalance < 0) ? toPositiveBalance(currentBalance) : currentBalance;
+
+  return response;
+
+}
+var getWalletTrustLineInfo = function(account, transactions, issuer, currencyId) {
+
+  let firstSet = maxDate;
+  let firstRemoved = maxDate;
+  let lastSet = minDate;
+  let lastRemoved = minDate;
+
+  let trustLinesSet = [];
+  
+  transactions.forEach((tx) => {
+      
+      if(tx.tx.TransactionType === tt_trustSet && tx.validated) {
+          if (tx.tx.LimitAmount.issuer == issuer && tx.tx.LimitAmount.currency == currencyId) {
+
+              let wasAdded = false;
+
+              for(let node of tx.meta.AffectedNodes) {
+                  if (node.hasOwnProperty("CreatedNode")) {
+                      wasAdded = true;
+                      break;     
+                  }
+              }
+
+              let trustLineDate = getDateTimeFromRippleTime(tx.tx.date);
+    
+              if (wasAdded) {
+                  if (trustLineDate < firstSet) firstSet = trustLineDate;
+                  if (trustLineDate > lastSet) lastSet = trustLineDate
+              } else {
+                  if (trustLineDate < firstRemoved) firstRemoved = trustLineDate;
+                  if (trustLineDate > lastRemoved) lastRemoved = trustLineDate
+              }
+              
+              trustLinesSet.push({
+                  "Added" : wasAdded,
+                  "DateTime" : trustLineDate
+              });
+
+          }
+      }
+
+  });
+
+  return {
+      account : account,
+      firstSet : firstSet != maxDate ? firstSet : null,
+      lastSet : lastSet != minDate ? lastSet : null,
+      firstRemoved :  firstRemoved != maxDate ? firstRemoved : null,
+      lastRemoved : lastRemoved != minDate ? lastRemoved : null,
+      history : trustLinesSet
+  };
 
 }
 
@@ -174,57 +316,54 @@ var getWalletTransactionsAsync = async function (client, account, oldest) {
   }
 
 }
-var getWalletTrustLineInfoAsync = async function(account, transactions, issuer, currencyId) {
+var getAccountCurrenciesAsync = async function(client, account) {
 
-    let firstSet = maxDate;
-    let firstRemoved = maxDate;
-    let lastSet = minDate;
-    let lastRemoved = minDate;
 
-    let trustLinesSet = [];
+  let getCurrencies = {
+    "command": "account_currencies",
+    "account": account,
+    "ledger_index": "validated"
+  };
+
+  let currencies = [];
+  await processAllMarkersAsync(client, getCurrencies, (batch) => {
+
+    currencies= currencies.concat(batch.result.send_currencies);
+
+    return true;
+
+  });
+
+  return currencies;
+
+}
+var getAccountLinessAsync = async function(client, account) {
+
+  let getLines = {
+    "command": "account_lines",
+    "account": account,
+    "ledger_index": "validated",
+    "limit" : 40
+  };
+
+  let balances = [];
+  await processAllMarkersAsync(client, getLines, (batch) => {
+
+    batch.result.lines.forEach(e => {
+      balances.push({
+        issuer: e.account,
+        currencyId: e.currency,
+        symbol: getCurrencySymbol(e.currency),
+        balance: e.balance,
+      });
+    })
     
-    transactions.forEach((tx) => {
-        
-        if(tx.tx.TransactionType === "TrustSet" && tx.validated) {
-            if (tx.tx.LimitAmount.issuer == issuer && tx.tx.LimitAmount.currency == currencyId) {
 
-                let wasAdded = false;
+    return true;
 
-                for(let node of tx.meta.AffectedNodes) {
-                    if (node.hasOwnProperty("CreatedNode")) {
-                        wasAdded = true;
-                        break;     
-                    }
-                }
+  });
 
-                let trustLineDate = getDateTimeFromRippleTime(tx.tx.date);
-      
-                if (wasAdded) {
-                    if (trustLineDate < firstSet) firstSet = trustLineDate;
-                    if (trustLineDate > lastSet) lastSet = trustLineDate
-                } else {
-                    if (trustLineDate < firstRemoved) firstRemoved = trustLineDate;
-                    if (trustLineDate > lastRemoved) lastRemoved = trustLineDate
-                }
-                
-                trustLinesSet.push({
-                    "Added" : wasAdded,
-                    "DateTime" : trustLineDate
-                });
-
-            }
-        }
-
-    });
-
-    return {
-        account : account,
-        firstSet : firstSet != maxDate ? firstSet : null,
-        lastSet : lastSet != minDate ? lastSet : null,
-        firstRemoved :  firstRemoved != maxDate ? firstRemoved : null,
-        lastRemoved : lastRemoved != minDate ? lastRemoved : null,
-        history : trustLinesSet
-    };
+  return balances;
 
 }
 
@@ -250,6 +389,70 @@ function checkMinBalance(minBalance = {currencyId, amount}) {
 function getCommentForScanMarker(marker) {
   return marker instanceof Object ? `ledger: ${marker.ledger}, seq: ${marker.seq}` : marker;
 }
+function getTransactionBalanceChange(affectedNodes, walletId)  {
+
+  let totalAdded = 0;
+  let totalRemoved = 0;
+
+  affectedNodes.forEach(function (node) {
+
+    let modNode = node.ModifiedNode;
+    if (!modNode || !modNode.LedgerEntryType)
+      return;
+
+    if (modNode.LedgerEntryType == lt_rippleState) {
+  
+      if (modNode.FinalFields.LowLimit.issuer == walletId)
+      {
+
+        let prevBalance = parseXrpAmountToFloat(modNode.PreviousFields.Balance.value);
+        let newBalance = parseXrpAmountToFloat(modNode.FinalFields.Balance.value);
+        let balanceChange = newBalance - prevBalance;
+
+        if (balanceChange > 0)
+          totalAdded += balanceChange;
+        else
+          totalRemoved += balanceChange;
+
+      }
+
+    };
+
+  });
+
+  return {
+    totalAdded : totalAdded,
+    totalRemoved : totalRemoved
+  };
+
+}
+function getCurrencySymbol(currency) {
+
+  if (currency.length == 3)
+    return currency;
+
+  let symbol = "";
+
+  for (var i = 0; i < currency.length; i += 2)
+    symbol += String.fromCharCode(parseInt(currency.substr(i, 2), 16));
+
+  return symbol;
+
+}
+function getTrustLineDate(AffectedNodes, txDate, issuer) {
+
+  let trustLineDate = new Date(8640000000000000);
+
+  AffectedNodes.forEach(function (node) {
+
+    if (node.CreatedNode?.NewFields?.HighLimit?.issuer == issuer)
+      trustLineDate = getDateTimeFromRippleTime(txDate);
+
+  });
+
+  return trustLineDate;
+
+}
 
 // Public module
 module.exports = {
@@ -266,7 +469,11 @@ module.exports = {
   processAllMarkersAsync : processAllMarkersAsync,
   toPositiveBalance : toPositiveBalance,
   getWalletTransactionsAsync : getWalletTransactionsAsync,
+  getAccountCurrenciesAsync: getAccountCurrenciesAsync,
+  getAccountLinessAsync: getAccountLinessAsync,
+  getAccountBalancesAsync: getAccountLinessAsync,
   getDateTimeFromRippleTime: getDateTimeFromRippleTime,
-  getWalletTrustLineInfoAsync: getWalletTrustLineInfoAsync
+  getWalletTrustLineInfo: getWalletTrustLineInfo,
+  getWalletTradingStats: getWalletTradingStats
 };
 
