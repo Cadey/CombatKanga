@@ -1,4 +1,4 @@
-//  Copyright 2021 KombatKanga Ltd (Company number 13709049)
+//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -13,24 +13,26 @@
 //  limitations under the License.
 //
 //
-//   _____                 _           _     _   __                                         _   
-//  /  __ \               | |         | |   | | / /                                        | |  
-//  | /  \/ ___  _ __ ___ | |__   __ _| |_  | |/ /  __ _ _ __   __ _  __ _        __ _ _ __| |_ 
-//  | |    / _ \| '_ ` _ \| '_ \ / _` | __| |    \ / _` | '_ \ / _` |/ _` |      / _` | '__| __|
-//  | \__/\ (_) | | | | | | |_) | (_| | |_  | |\  \ (_| | | | | (_| | (_| |  _  | (_| | |  | |_ 
-//   \____/\___/|_| |_| |_|_.__/ \__,_|\__| \_| \_/\__,_|_| |_|\__, |\__,_| (_)  \__,_|_|   \__|
-//                                                              __/ |                           
-//                                                             |___/      
+//
+//   ______            _                _    _                                          
+//  / _____)          | |          _   | |  / )                                         
+// | /      ___  ____ | | _   ____| |_ | | / / ____ ____   ____  ____   ____ ___  ____  
+// | |     / _ \|    \| || \ / _  |  _)| |< < / _  |  _ \ / _  |/ _  | / ___) _ \|    \ 
+// | \____| |_| | | | | |_) | ( | | |__| | \ ( ( | | | | ( ( | ( ( | |( (__| |_| | | | |
+//  \______)___/|_|_|_|____/ \_||_|\___)_|  \_)_||_|_| |_|\_|| |\_||_(_)____)___/|_|_|_|
+//                                                       (_____|                        
 //     
+//  [Combatkanga.com]
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
 //  If you want help using the XRPL.js libary or want us to add ant more functions
-//  please get in contact with us at [[support@kombatkanga.art]]
+//  please get in contact with us at [[support@combatkanga.com]]
 //
 //
 
-// Private variables
+//Imports
+const fs = require('fs');
 var ckTools = require('./ckTools');
 
 const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
@@ -42,9 +44,8 @@ async function getWalletTransactions() {
     let client = await ckTools.getClientAsync();
     let walletTransactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
 
-    walletTransactions.transactions.forEach((tx) => {
-        console.log(`Tx:  ${tx.tx.hash} - TransactionType: ${tx.tx.TransactionType}`)
-    });
+    // Write them to a file
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTransactions, null, 2));
 
     process.exit(1);
 }

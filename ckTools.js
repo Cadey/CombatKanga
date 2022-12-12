@@ -1,4 +1,4 @@
-//  Copyright 2021 KombatKanga Ltd (Company number 13709049)
+//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -13,22 +13,24 @@
 //  limitations under the License.
 //
 //
-//   _____                 _           _     _   __                                         _   
-//  /  __ \               | |         | |   | | / /                                        | |  
-//  | /  \/ ___  _ __ ___ | |__   __ _| |_  | |/ /  __ _ _ __   __ _  __ _        __ _ _ __| |_ 
-//  | |    / _ \| '_ ` _ \| '_ \ / _` | __| |    \ / _` | '_ \ / _` |/ _` |      / _` | '__| __|
-//  | \__/\ (_) | | | | | | |_) | (_| | |_  | |\  \ (_| | | | | (_| | (_| |  _  | (_| | |  | |_ 
-//   \____/\___/|_| |_| |_|_.__/ \__,_|\__| \_| \_/\__,_|_| |_|\__, |\__,_| (_)  \__,_|_|   \__|
-//                                                              __/ |                           
-//                                                             |___/      
+//
+//   ______            _                _    _                                          
+//  / _____)          | |          _   | |  / )                                         
+// | /      ___  ____ | | _   ____| |_ | | / / ____ ____   ____  ____   ____ ___  ____  
+// | |     / _ \|    \| || \ / _  |  _)| |< < / _  |  _ \ / _  |/ _  | / ___) _ \|    \ 
+// | \____| |_| | | | | |_) | ( | | |__| | \ ( ( | | | | ( ( | ( ( | |( (__| |_| | | | |
+//  \______)___/|_|_|_|____/ \_||_|\___)_|  \_)_||_|_| |_|\_|| |\_||_(_)____)___/|_|_|_|
+//                                                       (_____|                        
 //     
+//  [Combatkanga.com]
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
 //  If you want help using the XRPL.js libary or want us to add ant more functions
-//  please get in contact with us at [[support@kombatkanga.art]]
+//  please get in contact with us at [[support@combatkanga.com]]
 //
 //
+
 
 // Private variables - Dont change
 const xrpl = require('xrpl');
@@ -220,7 +222,7 @@ var getWalletTrustLineInfo = function(account, transactions, issuer, currencyId)
 
 }
 
-var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance = {currencyId, amount}) {
+var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance) {
 
   let useBalanceOk = checkMinBalance(minBalance);
 
@@ -239,8 +241,8 @@ var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SA
     }
     else {
       trustLines = trustLines.concat(batch.result.lines.filter(
-        (line) => isBalanceEnough(line, minBalance.amount, minBalance.currencyId)
-      ));
+          (line) => isBalanceEnough(line, minBalance.amount, minBalance.currencyId)
+        ));
     }
 
     return true;
@@ -248,6 +250,27 @@ var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SA
   });
 
   return trustLines;
+
+}
+var getAllCurrentNftsAsync = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER) {
+
+  let getWalletNfts = {
+    "command": "account_nfts",
+    "account": issuer,
+    "ledger_index": "validated",
+    "limit": limit
+  };
+
+  let NFTokens = [];
+  await processAllMarkersAsync(client, getWalletNfts, (batch) => {
+
+    NFTokens = NFTokens.concat(batch.result.account_nfts)
+
+    return true;
+
+  });
+
+  return NFTokens;
 
 }
 var processAllMarkersAsync = async function(client, request, perBatch) {
@@ -275,6 +298,77 @@ var processAllMarkersAsync = async function(client, request, perBatch) {
   }
 
 }
+
+var getIssuedNftIdsFromWallet = async function(client, issuer, oldest) {
+
+  let walletTransactions = await getWalletTransactionsAsync(client, issuer, oldest);
+
+  let txDetails = [];
+  walletTransactions.transactions.forEach(tx => {
+    if (tx.tx.TransactionType =="NFTokenMint" && tx.meta.TransactionResult == "tesSUCCESS"){
+        txDetails.push(tx.tx.hash);
+    } 
+  });
+
+  let tokens = [];
+  let totalNfts = txDetails.length;
+  for(let x = 0; x < totalNfts; x++) {
+
+    let result = await getTx(client, txDetails[x]);
+    
+    var oldIds = [];
+    var changedIds = [];
+
+    console.log(`Processing ${x} of ${totalNfts} nft's`)
+    result.result.meta.AffectedNodes.forEach(node => {
+
+        if (node.ModifiedNode != null && node.ModifiedNode.LedgerEntryType == "NFTokenPage")
+        {
+            if (node.ModifiedNode.PreviousFields.NFTokens && node.ModifiedNode.PreviousFields.NFTokens.length > 0)
+              oldIds = oldIds.concat(node.ModifiedNode.PreviousFields.NFTokens.map(e => e.NFToken.NFTokenID));
+
+            changedIds = changedIds.concat(node.ModifiedNode.FinalFields.NFTokens.map(e => e.NFToken.NFTokenID));
+        }
+        else if (node.CreatedNode != null && node.CreatedNode.LedgerEntryType == "NFTokenPage")
+        {
+            changedIds = changedIds.concat(node.CreatedNode.NewFields.NFTokens.map(e => e.NFToken.NFTokenID));
+        }
+
+    });
+
+    var tokenId = changedIds.filter(e => !oldIds.includes(e))[0];
+    tokens.push(tokenId);
+  }
+
+  return tokens;
+
+}
+
+var getTx = async function (client, txHash) {
+
+  let request = {
+    "command": "tx",
+    "transaction": txHash,
+    "binary": false
+  }
+
+  let response = await client.request(request);
+  return response;
+
+}
+
+var getNftInfo = async function (client, tokenId) {
+
+  let request = {
+    "command": "nft_info",
+    "nft_id": tokenId
+  }
+
+  let response = await client.request(request);
+  return response;
+
+}
+
 var getWalletTransactionsAsync = async function (client, account, oldest) {
 
   let request = {
@@ -372,7 +466,7 @@ var getAccountLinessAsync = async function(client, account) {
 }
 
 // Private methods
-function checkMinBalance(minBalance = {currencyId, amount}) {
+function checkMinBalance(minBalance) {
 
   if (minBalance)  {
 
@@ -464,7 +558,7 @@ module.exports = {
   maxDate: maxDate,
   minDate: minDate,
   getClientAsync: async function() {
-    const client = new xrpl.Client('wss://xrplcluster.com');
+    const client = new xrpl.Client('wss://s1.ripple.com');
     await client.connect();
     return client;
   },
@@ -478,6 +572,10 @@ module.exports = {
   getAccountBalancesAsync: getAccountLinessAsync,
   getDateTimeFromRippleTime: getDateTimeFromRippleTime,
   getWalletTrustLineInfo: getWalletTrustLineInfo,
-  getWalletTradingStats: getWalletTradingStats
+  getWalletTradingStats: getWalletTradingStats,
+  getAllCurrentNftsAsync: getAllCurrentNftsAsync,
+  getIssuedNftIdsFromWallet: getIssuedNftIdsFromWallet,
+  getTx: getTx,
+  getNftInfo: getNftInfo
 };
 

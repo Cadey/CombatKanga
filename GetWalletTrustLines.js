@@ -31,26 +31,20 @@
 //
 //
 
-
 //Imports
 const fs = require('fs');
 var ckTools = require('./ckTools');
+const account = "rKfSdse1GTQMyLkdnK29UnVuFWgLQMUXK8"; // walletId
 
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
-const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
-const oldest = Date.parse('01 Oct 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods
 async function GetWalletTrustLineInfo() {
 
     let client = await ckTools.getClientAsync();
-    let transactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
-
-    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, currencyId);
+    let trustLines = await ckTools.getAllTrustLinesAsync(client, account);
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTrustlineInfo, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
 
     process.exit(1);
 }

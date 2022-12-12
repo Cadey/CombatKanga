@@ -31,29 +31,23 @@
 //
 //
 
-
 //Imports
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
-const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
-const oldest = Date.parse('01 Oct 2021 00:00:00 UTC'); // How far to look back
+const account = "rJcuzN4WAwCZMxxhff5YmX2r4WjwLK4ujT"; // walletId
 
 // Private methods
-async function GetWalletTrustLineInfo() {
+async function GetWalletNfts() {
 
     let client = await ckTools.getClientAsync();
-    let transactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
-
-    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, currencyId);
+    let walletNfts = await ckTools.getAllCurrentNftsAsync(client, account);
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTrustlineInfo, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletNfts, null, 2));
 
     process.exit(1);
 }
 
 // Init
-GetWalletTrustLineInfo();
+GetWalletNfts();
