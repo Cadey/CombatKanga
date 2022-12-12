@@ -3,7 +3,7 @@
 One of the first ever NFT based games on the XRPL - Now opening up some of its tool bag to help other XRPL (NFT or not) projects work with XRPL SDK and Xumm SDK
 
 **We will be updating this repo as often as we can. Open to suggestions for tools which the community would like to see implemented.**
-**Contact us support@kombatkanga.art**
+**Contact us support@combatkanga.com**
 
 ## Setup - NPM packages
 `npm install xrpl -g`
