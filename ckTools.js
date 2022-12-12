@@ -45,9 +45,14 @@ const tt_offerCreate = "OfferCreate";
 
 const lt_rippleState = "RippleState";
 
+const convert = (from, to) => str => Buffer.from(str, from).toString(to)
+const utf8ToHex = convert('utf8', 'hex')
+const hexToUtf8 = convert('hex', 'utf8')
+
 // Private variables - customise as required
 const upperDecimalLimit = 0.99;
 const lowerDecimalLimit = 0.001;
+
 
 // Public methods
 var isBalanceEnough = function(line, requireBalance, currencyId)  {
@@ -557,6 +562,8 @@ module.exports = {
   xrpl: xrpl,
   maxDate: maxDate,
   minDate: minDate,
+  utf8ToHex: utf8ToHex,
+  hexToUtf8: hexToUtf8,
   getClientAsync: async function() {
     const client = new xrpl.Client('wss://s1.ripple.com');
     await client.connect();
