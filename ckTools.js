@@ -374,6 +374,88 @@ var getNftInfo = async function (client, tokenId) {
 
 }
 
+var findAndCancelExpiredNftOffers = async function (client, account, oldest, accountSeed, cancelBatchSize) {
+
+    cancelBatchSize = cancelBatchSize ?? 25;
+
+    let results = [];
+    let walletTransactions = await getWalletTransactionsAsync(client, account, oldest);
+    let expiredTokenOfferIds = [];
+    let handeledOfferIds =[];
+
+    walletTransactions.transactions.forEach(t => {
+        if (t.tx.TransactionType === "NFTokenCreateOffer") {
+
+            if (t.tx.Expiration < ((new Date().getTime() - rippleTime()) / 1000)) {
+                var offerId = t.meta.AffectedNodes.filter(e => e.CreatedNode?.LedgerEntryType== "NFTokenOffer")[0]?.CreatedNode.LedgerIndex ?? false;
+
+                if (offerId){
+                    expiredTokenOfferIds.push(offerId);
+                }
+            }
+        }
+        else if (t.tx.TransactionType === "NFTokenAcceptOffer" || t.tx.TransactionType === "NFTokenCancelOffer") {
+
+            if (t.tx.NFTokenOffers) {
+                handeledOfferIds = handeledOfferIds.concat(t.tx.NFTokenOffers);
+            } else {
+                handeledOfferIds.push(t.tx.NFTokenSellOffer);
+            }
+
+        }
+    });
+
+    let activeExpiredTokenOfferIds = expiredTokenOfferIds.filter(e => !handeledOfferIds.includes(e));
+    let totalItems = activeExpiredTokenOfferIds.length;
+    for(let x = 0; x < (totalItems+cancelBatchSize) / cancelBatchSize; x++) {
+
+        let offersToCancel = [];
+        let getIds = true;
+        while(getIds) {
+            let id = activeExpiredTokenOfferIds.pop();
+            if (!id){
+                break;
+            }
+            offersToCancel.push(id);
+            getIds = offersToCancel.length < cancelBatchSize;
+        }
+        
+        if (offersToCancel.length > 0){
+            console.log(`Canceling offers ${offersToCancel.join(', ')}`);
+            let cancelResult = await cancelNftOffer(client, account, offersToCancel, accountSeed);
+            results.push(cancelResult);
+            console.log(`Result ${cancelResult}`);
+        }
+    }
+
+    return results;
+
+}
+
+var cancelNftOffer = async function(client, account, offerIds, seed) {
+
+  let request = {
+    "TransactionType": "NFTokenCancelOffer",
+    "Account": account,
+    "NFTokenOffers": offerIds
+  }
+
+  return await sendSignedPayload(client, seed, request);
+
+}
+
+var sendSignedPayload = async function(client, seed, payload) {
+
+  let wallet = xrpl.Wallet.fromSecret(seed);
+
+  const prepared = await client.autofill(payload);
+  const signed = wallet.sign(prepared);
+  const result = await client.submitAndWait(signed.tx_blob)
+
+  return result;
+
+}
+
 var getWalletTransactionsAsync = async function (client, account, oldest) {
 
   let request = {
@@ -470,6 +552,8 @@ var getAccountLinessAsync = async function(client, account) {
 
 }
 
+var rippleTime = () => new Date(Date.parse("1/1/2000 00:00:00Z")).getTime();
+
 // Private methods
 function checkMinBalance(minBalance) {
 
@@ -562,10 +646,11 @@ module.exports = {
   xrpl: xrpl,
   maxDate: maxDate,
   minDate: minDate,
+  rippleTime: rippleTime,
   utf8ToHex: utf8ToHex,
   hexToUtf8: hexToUtf8,
-  getClientAsync: async function() {
-    const client = new xrpl.Client('wss://s1.ripple.com');
+  getClientAsync: async function(server) {
+    const client = new xrpl.Client(server ?? 'wss://s1.ripple.com');
     await client.connect();
     return client;
   },
@@ -583,6 +668,9 @@ module.exports = {
   getAllCurrentNftsAsync: getAllCurrentNftsAsync,
   getIssuedNftIdsFromWallet: getIssuedNftIdsFromWallet,
   getTx: getTx,
-  getNftInfo: getNftInfo
+  getNftInfo: getNftInfo,
+  sendSignedPayload : sendSignedPayload,
+  cancelNftOffer : cancelNftOffer,
+  findAndCancelExpiredNftOffers: findAndCancelExpiredNftOffers
 };
 
