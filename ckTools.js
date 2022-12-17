@@ -311,7 +311,7 @@ var getIssuedNftIdsFromWallet = async function(client, issuer, oldest) {
   let txDetails = [];
   walletTransactions.transactions.forEach(tx => {
     if (tx.tx.TransactionType =="NFTokenMint" && tx.meta.TransactionResult == "tesSUCCESS"){
-        txDetails.push(tx.tx.hash);
+        txDetails.push({hash: tx.tx.hash, uri : tx.tx.URI});
     } 
   });
 
@@ -319,7 +319,7 @@ var getIssuedNftIdsFromWallet = async function(client, issuer, oldest) {
   let totalNfts = txDetails.length;
   for(let x = 0; x < totalNfts; x++) {
 
-    let result = await getTx(client, txDetails[x]);
+    let result = await getTx(client, txDetails[x].hash);
     
     var oldIds = [];
     var changedIds = [];
@@ -342,7 +342,7 @@ var getIssuedNftIdsFromWallet = async function(client, issuer, oldest) {
     });
 
     var tokenId = changedIds.filter(e => !oldIds.includes(e))[0];
-    tokens.push(tokenId);
+    tokens.push({tokenId: tokenId, uri: hexToUtf8(txDetails[x].uri)});
   }
 
   return tokens;
