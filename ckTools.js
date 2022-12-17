@@ -329,10 +329,10 @@ var getIssuedNftIdsFromWallet = async function(client, issuer, oldest) {
 
         if (node.ModifiedNode != null && node.ModifiedNode.LedgerEntryType == "NFTokenPage")
         {
-            if (node.ModifiedNode.PreviousFields.NFTokens && node.ModifiedNode.PreviousFields.NFTokens.length > 0)
+            if (node.ModifiedNode.PreviousFields.NFTokens && node.ModifiedNode.PreviousFields.NFTokens.length > 0) {
               oldIds = oldIds.concat(node.ModifiedNode.PreviousFields.NFTokens.map(e => e.NFToken.NFTokenID));
-
-            changedIds = changedIds.concat(node.ModifiedNode.FinalFields.NFTokens.map(e => e.NFToken.NFTokenID));
+              changedIds = changedIds.concat(node.ModifiedNode.FinalFields.NFTokens.map(e => e.NFToken.NFTokenID));
+            }
         }
         else if (node.CreatedNode != null && node.CreatedNode.LedgerEntryType == "NFTokenPage")
         {
