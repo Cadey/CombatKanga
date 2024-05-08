@@ -7,8 +7,8 @@ One of the first ever NFT based games on the XRPL - Now opening up some of its t
 
 ## Setup - NPM packages
 `npm install xrpl -g`
-
 `npm install from-exponential`
+`npm install mathjs`
 
 ## CombatKanga utilities
 

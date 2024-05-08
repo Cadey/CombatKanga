@@ -35,22 +35,52 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const cancelBatchSize = 25;
-const account = "[walletId]"; // walletId
-const accountSeed = "[WalletSeed]"; // seed for waller that owns the offer
-const oldest = Date.parse('01 Dec 2022 00:00:00 UTC'); // How far to look back
+const fromAccount = "[walletId]"; // Sending wallet 
+const accountSeed = "[walletSeed]"; // Seed of sending wallet
+const currencyCode = "XYZ"; // Currency to send E.g XRP, xSPECTAR
+const issuerAccount = "[walletId]"; // Issuer wallet, required if currency is NOT XRP
+const memoText = "" // Memo for the transaction E.g July ambassador rewards
+let amounts = [];
 
 // Private methods
-async function cancelAllExpiredNftOffers() {
+async function airdropTokens() {
 
     let client = await ckTools.getClientAsync('wss://xrplcluster.com');
-    let results = await ckTools.findAndCancelExpiredNftOffers(client, account, oldest, accountSeed, cancelBatchSize);
+    let results = [];
+    
+    addAmounts();
+    try {
+
+        for(let x = 0; x < amounts.length; x++) {
+            var ledgerDetails = await ckTools.getLedgerDetails(client);
+            let maxLedgerIndex = ledgerDetails.result.ledger_index + 15;
+            results.push(await ckTools.airdropToken(client, amounts[x].account, amounts[x].amount, amounts[x].currencyCode, amounts[x].issuerAccount, fromAccount, accountSeed, maxLedgerIndex, memoText))
+        }
+    }
+    catch(e){
+        console.log(e);
+    }
 
     // Write them to a file
     //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(results, null, 2));
 
     process.exit(1);
 }
+function addAmount(account, amount, currencyCode, issuerAccount) {
+    amounts.push({ account: account, amount: amount, currencyCode: currencyCode, issuerAccount: issuerAccount });
+}
+function addAmounts() {
+
+    //addAmount("WALLET TO GET THE AIRDROP", [AMOUNT TO GET], currencyCode, issuerAccount);
+    //
+    //E.g
+    //addAmount("rh5jzTCdMRCVjQ7LT6zucjezC47KATkAAA", 10000, currencyCode, issuerAccount);
+    
+}
 
 // Init
-cancelAllExpiredNftOffers();
+airdropTokens();
+
+
+
+

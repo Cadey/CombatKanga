@@ -1,4 +1,4 @@
-//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
+const account = "[WalletId]"; // walletId
 const oldest = Date.parse('01 Dec 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods

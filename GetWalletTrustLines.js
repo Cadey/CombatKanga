@@ -1,4 +1,4 @@
-//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -34,18 +34,18 @@
 //Imports
 const fs = require('fs');
 var ckTools = require('./ckTools');
-const account = "rKfSdse1GTQMyLkdnK29UnVuFWgLQMUXK8"; // walletId
-
+const account = "[walletId]";
+const minBalance = { currencyId: ckTools.parseCurrencyCode('XYZ'), balance: 1 };
+const maxTrustLinesToGet = undefined;
 
 // Private methods
 async function GetWalletTrustLineInfo() {
 
     let client = await ckTools.getClientAsync();
-    let trustLines = await ckTools.getAllTrustLinesAsync(client, account);
+    let trustLines = await ckTools.getAllTrustLinesAsync(client, account, maxTrustLinesToGet, minBalance);
 
     // Write them to a file
     //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
-
     process.exit(1);
 }
 

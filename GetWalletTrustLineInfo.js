@@ -1,4 +1,4 @@
-//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -36,9 +36,9 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
-const account = "r3GKoSMHim8VfzX7Ewjfqi2Rzg85hJDt7z"; // walletId
+const currencyCode = "XYZ";
+const issuer = "[walletId]";
+const account = "[walletId]";
 const oldest = Date.parse('01 Oct 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods
@@ -47,7 +47,7 @@ async function GetWalletTrustLineInfo() {
     let client = await ckTools.getClientAsync();
     let transactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
 
-    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, currencyId);
+    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, ckTools.parseCurrencyCode(currencyCode));
 
     // Write them to a file
     //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTrustlineInfo, null, 2));

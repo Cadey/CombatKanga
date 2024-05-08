@@ -1,4 +1,4 @@
-//  Copyright 2021 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -35,6 +35,8 @@
 // Private variables - Dont change
 const xrpl = require('xrpl');
 const fromExponential = require('from-exponential');
+const { isNumber } = require('mathjs');
+const { default: fundWallet } = require('xrpl/dist/npm/Wallet/fundWallet');
 const rippleTimeOffSet = 946684800;
 const maxDate = new Date(8640000000000000);
 const minDate = new Date(-8640000000000000);;
@@ -45,7 +47,7 @@ const tt_offerCreate = "OfferCreate";
 
 const lt_rippleState = "RippleState";
 
-const convert = (from, to) => str => Buffer.from(str, from).toString(to)
+const convert = (from, to) => str => Buffer.from(str, from).toString(to).toUpperCase()
 const utf8ToHex = convert('utf8', 'hex')
 const hexToUtf8 = convert('hex', 'utf8')
 
@@ -227,7 +229,7 @@ var getWalletTrustLineInfo = function(account, transactions, issuer, currencyId)
 
 }
 
-var getAllTrustLinesAsync = async function(client, issuer, limit = Number.MAX_SAFE_INTEGER, minBalance) {
+var getAllTrustLinesAsync = async function(client, issuer, limit = 200, minBalance) {
 
   let useBalanceOk = checkMinBalance(minBalance);
 
@@ -444,6 +446,65 @@ var cancelNftOffer = async function(client, account, offerIds, seed) {
 
 }
 
+var airdropToken = async function(client, toAccount, amount, currencyCode, issuerAccount, fromAccount, fromAccountSeed, maxSequenceNumber, memoText = "", feeInDrops = 12) {
+
+    let memo;
+    if (memoText && memoText != "") {
+      memo = {
+        "Memo": {
+          "MemoType": `${utf8ToHex("Note")}`,
+          "MemoData": `${utf8ToHex(memoText)}`
+        }
+      }
+    }
+  
+    let amountStr;
+    if (currencyCode == "xrp") {
+      amountStr = amount.XrpBalanceToDrops().ToString();
+    } else {
+
+      var code = parseCurrencyCode(currencyCode);
+      
+      amountStr = {
+                "currency": `${code}`, 
+                "issuer": issuerAccount,
+                "value": `${amount}`
+            };
+    }
+  
+    let request = {
+      "TransactionType": "Payment",
+      "Destination": toAccount,
+      "Account": fromAccount,
+      "Amount": amountStr,
+      "LastLedgerSequence" : maxSequenceNumber,
+      "Fee" : `${feeInDrops}`,
+    }
+  
+    if (memo) {
+      request["Memos"] = [memo]
+    }
+  
+    return await sendSignedPayload(client, fromAccountSeed, request);
+
+  }
+
+var getLedgerDetails = async function (client) {
+
+  let tx = {
+    "command": "ledger",
+    "ledger_index": "validated",
+    "full": false,
+    "accounts": false,
+    "transactions": false,
+    "expand": false,
+    "owner_funds": false
+  };
+
+  return await client.request(tx);
+
+}
+
 var sendSignedPayload = async function(client, seed, payload) {
 
   let wallet = xrpl.Wallet.fromSecret(seed);
@@ -552,7 +613,183 @@ var getAccountLinessAsync = async function(client, account) {
 
 }
 
+
+var setupAccountAsIssuer = async function(client, wallet) {
+
+  const cold_settings_tx = {
+    "TransactionType": "AccountSet",
+    "Account": wallet.address,
+    "TransferRate": 0,
+    "TickSize": 5,
+    "SetFlag": xrpl.AccountSetAsfFlags.asfDefaultRipple
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, wallet.seed, cold_settings_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not update account settings`);
+    } else {
+      console.log(`Cold wallet (issuer account) settings changed`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+var createTrustLine = async function(client, wallet, issuerAccount, currencyCode, totalFor) {
+
+  let currency_code_hex = parseCurrencyCode(currencyCode);
+
+  if (isNumber(totalFor)) {
+    totalFor = `${totalFor}`;
+  }
+
+  var wallet_trust_set_tx = {
+      "TransactionType": "TrustSet",
+      "Account": wallet.address,
+      "Flags": 131072,
+      "LimitAmount": {
+          "currency": currency_code_hex,
+          "issuer": issuerAccount,
+          "value": totalFor
+      }
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, wallet.seed, wallet_trust_set_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not add trustline to wallet ${wallet.address}`);
+      console.log(`${result.result.meta.TransactionResult}`);
+    } {
+      console.log(`Trust line added from ${issuerAccount} to ${wallet.address}`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+var sendTokensToWallet = async function(client, wallet, destinationAccount, issuerAccount, currencyCode, amountToSend) {
+
+    let currency_code_hex = parseCurrencyCode(currencyCode);
+
+    if (isNumber(amountToSend)) {
+      amountToSend = `${amountToSend}`;
+    }
+
+    var send_token_tx = {
+      "TransactionType": "Payment",
+      "Destination": destinationAccount,
+      "Account": wallet.address,
+      "Amount": {
+          "currency": currency_code_hex,
+          "issuer": issuerAccount,
+          "value": amountToSend
+      }
+    }
+
+    try {
+
+      let result = await sendSignedPayload(client, wallet.seed, send_token_tx);
+  
+      if (result.result.meta.TransactionResult != "tesSUCCESS") {
+        console.log(`Could not send tokens to wallet ${wallet.address}`);
+        console.log(`${result.result.meta.TransactionResult}`);
+      } else {
+        console.log(`Wallet ${destinationAccount} received ${amountToSend} of ${currencyCode}`);
+      }
+  
+      return result;
+  
+    }
+    catch (e) {
+        console.log(`${e}`);
+        return;
+    }
+
+
+
+}
+var fundThisWallet = async function(client, wallet, amountToSend) {
+
+  if (isNumber(amountToSend)) {
+    amountToSend = `${amountToSend}`;
+  }
+
+  var result = await client.fundWallet(wallet, { amount: amountToSend });
+
+  if (!result || !result.wallet || result.balance < amountToSend) {
+    console.log(`Could not fund wallet ${wallet.address}`);
+  } else {
+    console.log(`Wallet ${result.wallet.address} funded with ${amountToSend}`);
+  }
+
+  return result;
+
+}
+var generateWallets = async function(client, amount, fundWithAdditional) {
+
+  let wallets = [];
+  let i = 0;
+
+  while (i < amount) {
+      const fund_result = await client.fundWallet();
+      const new_wallet = fund_result.wallet
+      wallets.push(new_wallet);
+      console.log(`Wallet generated s:${new_wallet.seed} r:${new_wallet.address}`);
+
+      if (fundWithAdditional && fundWithAdditional > 0) {
+        await fundThisWallet(client, new_wallet,fundWithAdditional);
+      }
+
+      i++;
+  }
+
+  return wallets;
+
+}
+var getWalletFromSeed = function(seed) {
+
+  return xrpl.Wallet.fromSecret(seed);
+
+}
+var generateWallet = async function(client, fundWithAdditional) {
+
+  var result = await client.fundWallet();
+
+  if (fundWithAdditional && fundWithAdditional > 0) {
+    await fundWallet(client, result.wallet,fundWithAdditional);
+  }
+
+  return result.wallet;
+
+}
+
+var parseCurrencyCode = function(currencyCode) {
+
+  if (currencyCode.length > 3 && currencyCode.length < 40) { 
+      return pad('0000000000000000000000000000000000000000', utf8ToHex(currencyCode), true);
+  }
+
+  return currencyCode;
+
+}
+
 var rippleTime = () => new Date(Date.parse("1/1/2000 00:00:00Z")).getTime();
+
 
 // Private methods
 function checkMinBalance(minBalance) {
@@ -640,6 +877,17 @@ function getTrustLineDate(AffectedNodes, txDate, issuer) {
   return trustLineDate;
 
 }
+function pad(pad, str, padLeft) {
+  if (typeof str === 'undefined') 
+    return pad;
+  if (padLeft) {
+    return (pad + str).slice(-pad.length);
+  } else {
+    return (str + pad).substring(0, pad.length);
+  }
+}
+
+
 
 // Public module
 module.exports = {
@@ -650,7 +898,7 @@ module.exports = {
   utf8ToHex: utf8ToHex,
   hexToUtf8: hexToUtf8,
   getClientAsync: async function(server) {
-    const client = new xrpl.Client(server ?? 'wss://s1.ripple.com');
+    const client = new xrpl.Client(server ?? 'wss://xrpl.link');
     await client.connect();
     return client;
   },
@@ -671,6 +919,16 @@ module.exports = {
   getNftInfo: getNftInfo,
   sendSignedPayload : sendSignedPayload,
   cancelNftOffer : cancelNftOffer,
-  findAndCancelExpiredNftOffers: findAndCancelExpiredNftOffers
+  findAndCancelExpiredNftOffers: findAndCancelExpiredNftOffers,
+  airdropToken: airdropToken,
+  getLedgerDetails: getLedgerDetails,
+  setupAccountAsIssuer: setupAccountAsIssuer,
+  createTrustLine:createTrustLine,
+  sendTokensToWallet: sendTokensToWallet,
+  fundThisWallet: fundThisWallet,
+  generateWallets: generateWallets,
+  getWalletFromSeed : getWalletFromSeed,
+  generateWallet: generateWallet,
+  parseCurrencyCode: parseCurrencyCode
 };
 
