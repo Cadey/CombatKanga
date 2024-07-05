@@ -36,7 +36,6 @@
 const xrpl = require('xrpl');
 const fromExponential = require('from-exponential');
 const { isNumber } = require('mathjs');
-const { default: fundWallet } = require('xrpl/dist/npm/Wallet/fundWallet');
 const rippleTimeOffSet = 946684800;
 const maxDate = new Date(8640000000000000);
 const minDate = new Date(-8640000000000000);;
@@ -446,6 +445,162 @@ var cancelNftOffer = async function(client, account, offerIds, seed) {
 
 }
 
+var createNftCollection = async function(client, issuer, seed, taxon, transferFee, flags, metadataUriArray) {
+
+
+  let results = [];
+  let tokenIds = [];
+
+  for(var x = 0; x < metadataUriArray.length; x++) {
+
+    try {
+
+      let request = {
+        "TransactionType": `NFTokenMint`,
+        "Account": `${issuer}`,
+        "URI": `${utf8ToHex(metadataUriArray[x])}`,
+        "Flags": flags,
+        "NFTokenTaxon": taxon,
+        "TransferFee": transferFee
+      }
+
+      console.log(`Minting ${metadataUriArray[x]}`);
+      var result = await sendSignedPayload(client, seed, request);
+
+      var tokenId = "no-created";
+      var oldIds = [];
+      var changedIds = [];
+      result.result.meta.AffectedNodes.forEach(node => {
+        if (node.ModifiedNode != null && node.ModifiedNode.LedgerEntryType == "NFTokenPage")
+          {
+          
+              if (node.ModifiedNode.PreviousFields.NFTokens.length > 0)
+              {
+                  oldIds.push(...node.ModifiedNode.PreviousFields.NFTokens.map(e => e.NFToken.NFTokenID));
+                  changedIds.push(...node.ModifiedNode.FinalFields.NFTokens.map(e => e.NFToken.NFTokenID));
+              }
+          
+          }
+          else if (node.CreatedNode != null && node.CreatedNode.LedgerEntryType == "NFTokenPage")
+          {
+            changedIds.push(...node.CreatedNode.NewFields.NFTokens.map(e => e.NFToken.NFTokenID));
+          }
+                                  
+      })
+      tokenId = changedIds.filter(e => !oldIds.includes(e))[0];
+      console.log(`Minted NFT ${metadataUriArray[x]} as : ${tokenId}`);
+
+      results.push(result);
+      tokenIds.push(tokenId);
+
+    }
+    catch (e) {
+      console.log(`Failed to mint ${metadataUriArray[x]}`);
+      console.log(`${e}`);
+    }
+    
+
+  }
+
+  return {results, tokenIds};
+
+}
+var createNftOffer = async function(client, account, seed, destinationWalletAddress, tokenId, amount, currencyCode, currencyIssuerAccount, expiredInSeconds, isSell, memoNote, ownerWalletAddress) {
+
+  let expiredTime = "";
+
+  if (expiredInSeconds != null) {
+      //expiredTime = (new Date().getTime() - rippleTime()) + (expiredInSeconds * 1000)
+  }
+
+  let amountStr;
+    if (currencyCode == "xrp") {
+      amountStr = `${XrpBalanceToDrops(amount)}`;
+    } else {
+
+      var code = parseCurrencyCode(currencyCode);
+      
+      amountStr = {
+                "currency": `${code}`, 
+                "issuer": currencyIssuerAccount,
+                "value": `${amount}`
+            };
+    }
+
+  let request = {
+    "TransactionType": "NFTokenCreateOffer",
+    "Account": `${account}`,
+    "NFTokenID": `${tokenId}`,
+    "Amount": amountStr,
+    "Flags": (isSell ? 1 : 0),
+    "Memos": [
+        {
+            "Memo": {
+                "MemoType": `${utf8ToHex("Note")}`,
+                "MemoData": `${utf8ToHex(memoNote)}`
+            }
+        }
+    ]
+  };
+
+  if (expiredTime) {
+    request["Expiration"] = expiredTime;
+  }
+  if (destinationWalletAddress) {
+    request["Destination"] = destinationWalletAddress;
+  }
+  if (ownerWalletAddress) {
+    request["Owner"] = ownerWalletAddress;
+  }
+  
+  var result = await sendSignedPayload(client, seed, request);
+
+  var offerId = '';
+  var offerResult = await getTx(client, result.result.hash);
+  offerResult.result.meta.AffectedNodes.forEach(node => {
+    if (node.CreatedNode != null && node.CreatedNode.LedgerEntryType == "NFTokenOffer")
+      {
+          offerId = node.CreatedNode.LedgerIndex;
+      }
+  });
+  
+  console.log(`Created NFTokenCreateOffer, Offer Id :${offerId}`);
+  return {result, offerId}
+
+}
+var acceptNftOffer = async function(client, account, seed, buyOfferId, sellOfferId, brokerFeeInXrp, memo) {
+
+  let request = {
+    "TransactionType": "NFTokenAcceptOffer",
+    "Account": `${account}`,
+    "Memos" : [
+        {
+            "Memo" : {
+                "MemoType": `${utf8ToHex("Note")}`,
+                "MemoData": `${utf8ToHex(memo)}`
+            }
+        }
+      ]
+    };
+
+    if (sellOfferId) {
+      request["NFTokenSellOffer"] = sellOfferId
+    }
+    if (buyOfferId) {
+      request["NFTokenBuyOffer"] = buyOfferId
+    }
+    if (brokerFeeInXrp) {
+      request["NFTokenBrokerFee"] = buyOfferId
+    }
+
+    var result = await sendSignedPayload(client, seed, request);
+    console.log(`Accepted NFTokenCreateOffer with NFTokenAcceptOffer, hash :${result.result.hash} - Result ${result.result.meta.TransactionResult}`);
+
+    return result;
+
+}
+
+
 var airdropToken = async function(client, toAccount, amount, currencyCode, issuerAccount, fromAccount, fromAccountSeed, maxSequenceNumber, memoText = "", feeInDrops = 12) {
 
     let memo;
@@ -487,7 +642,7 @@ var airdropToken = async function(client, toAccount, amount, currencyCode, issue
   
     return await sendSignedPayload(client, fromAccountSeed, request);
 
-  }
+}
 
 var getLedgerDetails = async function (client) {
 
@@ -504,10 +659,22 @@ var getLedgerDetails = async function (client) {
   return await client.request(tx);
 
 }
-
 var sendSignedPayload = async function(client, seed, payload) {
 
   let wallet = xrpl.Wallet.fromSecret(seed);
+
+
+  if (!payload.Memos)  {
+    payload["Memos"] = [];
+  }
+  payload.Memos.push(
+    {
+      "Memo": {
+        "MemoType": `${utf8ToHex("Note")}`,
+        "MemoData": `${utf8ToHex("Created with ckTools @ https://github.com/Cadey/CombatKanga")}`
+      }
+    }
+  )
 
   const prepared = await client.autofill(payload);
   const signed = wallet.sign(prepared);
@@ -516,7 +683,6 @@ var sendSignedPayload = async function(client, seed, payload) {
   return result;
 
 }
-
 var getWalletTransactionsAsync = async function (client, account, oldest) {
 
   let request = {
@@ -771,8 +937,10 @@ var generateWallet = async function(client, fundWithAdditional) {
   var result = await client.fundWallet();
 
   if (fundWithAdditional && fundWithAdditional > 0) {
-    await fundWallet(client, result.wallet,fundWithAdditional);
+    await fundThisWallet(client, result.wallet,fundWithAdditional);
   }
+
+  console.log(`New wallet created s:${result.wallet.seed} r:${result.wallet.address}`);
 
   return result.wallet;
 
@@ -886,7 +1054,7 @@ function pad(pad, str, padLeft) {
     return (str + pad).substring(0, pad.length);
   }
 }
-
+function XrpBalanceToDrops(amount) { return (amount * 1000000) }
 
 
 // Public module
@@ -920,6 +1088,9 @@ module.exports = {
   sendSignedPayload : sendSignedPayload,
   cancelNftOffer : cancelNftOffer,
   findAndCancelExpiredNftOffers: findAndCancelExpiredNftOffers,
+  createNftCollection : createNftCollection,
+  createNftOffer : createNftOffer,
+  acceptNftOffer : acceptNftOffer,
   airdropToken: airdropToken,
   getLedgerDetails: getLedgerDetails,
   setupAccountAsIssuer: setupAccountAsIssuer,
@@ -930,5 +1101,6 @@ module.exports = {
   getWalletFromSeed : getWalletFromSeed,
   generateWallet: generateWallet,
   parseCurrencyCode: parseCurrencyCode
+
 };
 
