@@ -32,7 +32,6 @@
 //
 
 //Imports
-const fs = require('fs');
 var ckTools = require('./ckTools');
 const network_server = 'wss://s.altnet.rippletest.net:51233';
 

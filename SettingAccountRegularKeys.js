@@ -32,12 +32,11 @@
 //
 
 //Imports
-const fs = require('fs');
 var ckTools = require('./ckTools');
 const network_server = 'wss://s.altnet.rippletest.net:51233';
 
 // Private methods
-async function SettingsAccountRegularKeys() {
+async function SettingAccountRegularKeys() {
 
     let client = await ckTools.getClientAsync(network_server);
 
@@ -62,4 +61,4 @@ async function SettingsAccountRegularKeys() {
 }
 
 // Init
-SettingsAccountRegularKeys();
+SettingAccountRegularKeys();
