@@ -182,11 +182,10 @@ async function BuyAndSellNfts(client, accounts, nfts) {
     console.log(`${accounts[1].address} failed to accept buy offer ${bOffer1.offerId} because ${accounts[6].address} balance was too low - Result ${sr5.result.meta.TransactionResult}`);
 
 
-    // Create an orphaned offer, bOffer3 will be orphend and will fail is the new owner tried to use it.
+    // Create an orphaned offer, bOffer5 will be orphend and will fail because the owner changed.
     //---------------------------------------------------------------------------
 
     // This should be two sell offers, and then one is accepted and the second one should fail?
-
     let sOffer4 = await ckTools.createNftOffer(client, accounts[2].address, accounts[2].seed, null, nfts.tokenIds[4], 100, 'xrp', '', 1200, true, `Creating a sell offer for ${nfts.tokenIds[4]}`);
     console.log(`${accounts[6].address} Created a sell offer for ${nfts.tokenIds[4]} for 100 xrp`);
 
@@ -197,7 +196,7 @@ async function BuyAndSellNfts(client, accounts, nfts) {
         var sr6 = await ckTools.acceptNftOffer(client, accounts[6].address, accounts[6].seed, null, sOffer4.offerId, null, `Accepting a sell offer for ${nfts.tokenIds[4]} sending to ${accounts[6].address}`);
         console.log(`${accounts[6].address} accepts the sell offer from ${accounts[2].address} for 100 xrp - Result ${sr6.result.meta.TransactionResult}`);
 
-        // Account 6 will now try to accept bOffer3 for 200 XRP, it should fail
+        // Account 6 will now try to accept bOffer5 for 200 XRP, it should fail
         var sr7 = await ckTools.acceptNftOffer(client, accounts[7].address, accounts[7].seed, null, sOffer5.offerId, null, `Accepting a sell offer for ${nfts.tokenIds[4]} when it was already sold to ${accounts[6].address}`);
         console.log(`${accounts[7].address} failes to accepts the now orphended sell offer from ${accounts[2].address} for 200 xrp because it was already sold to ${accounts[6].address}  - Result ${sr7.result.meta.TransactionResult}`);
 
