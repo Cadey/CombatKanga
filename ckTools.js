@@ -683,6 +683,16 @@ var sendSignedPayload = async function(client, seed, payload) {
   return result;
 
 }
+
+var prepareTx = async function(client, payload, signers) {
+  return await client.autofill(payload, signers);
+}
+var signFor = function(wallet, payload) {
+
+  return wallet.sign(payload, true);
+
+}
+
 var getWalletTransactionsAsync = async function (client, account, oldest) {
 
   let request = {
@@ -809,6 +819,60 @@ var setupAccountAsIssuer = async function(client, wallet) {
   }
 
 }
+var disableAccountMasterKeyPair = async function(client, wallet) {
+
+  const disable_master_tx = {
+    "TransactionType": "AccountSet",
+    "Account": wallet.address,
+    "SetFlag": xrpl.AccountSetAsfFlags.asfDisableMaster
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, wallet.seed, disable_master_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not disable master key`);
+    } else {
+      console.log(`Account master Key disabled`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+var enableAccountMasterKeyPair = async function(client, wallet, seed) {
+
+  const enable_master_tx = {
+    "TransactionType": "AccountSet",
+    "Account": wallet.address,
+    "ClearFlag": xrpl.AccountSetAsfFlags.asfDisableMaster
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, seed, enable_master_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not enable master key`);
+    } else {
+      console.log(`Account master Key enabled`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
 var createTrustLine = async function(client, wallet, issuerAccount, currencyCode, totalFor) {
 
   let currency_code_hex = parseCurrencyCode(currencyCode);
@@ -889,6 +953,114 @@ var sendTokensToWallet = async function(client, wallet, destinationAccount, issu
 
 
 }
+
+var sendXrpToaccount = async function(client, account, destinationAccount, xrpToSend, seed) {
+
+  let xrpToSendAsDrops = xrpl.xrpToDrops(xrpToSend);
+
+  var send_token_tx = {
+    "TransactionType": "Payment",
+    "Destination": destinationAccount,
+    "Account": account.address,
+    "Amount": `${xrpToSendAsDrops}`
+  }
+
+  let _seed = seed ?? account.seed;
+
+  if (seed) {
+    console.log(`Warning : Signing with supplied seed, not with 'account.seed'`);
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, _seed, send_token_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not send xrp to account ${account.address}`);
+      console.log(`${result.result.meta.TransactionResult}`);
+    } else {
+      console.log(`account ${destinationAccount} received ${xrpToSend} of xrp`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+
+
+}
+var removeRegularKeyOnaccount = async function(client, account) {
+  return setRegularKeyOnaccount(client, account, '');
+}
+var setRegularKeyOnaccount = async function(client, account, newaccountAddress) {
+
+  var set_regular_key_tx = {
+    "TransactionType": "SetRegularKey",
+    "Account": account.address,
+    "Flags": 0,
+    "RegularKey": newaccountAddress.address
+  }
+
+  try {
+
+    let result = await sendSignedPayload(client, account.seed, set_regular_key_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not set regular key to ${newaccountAddress.address} on account ${account.address}`);
+      console.log(`${result.result.meta.TransactionResult}`);
+    } else {
+      console.log(`account ${newaccountAddress.address} set as regular key for ${account.address}`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+var setAccountMultiSignerList = async function(client, account, quorum, accountsAndWeights) {
+
+  var signers = [];
+  for (let i = 0; i < accountsAndWeights.length; i++) {
+    signers.push({ "SignerEntry" : { "Account" : `${accountsAndWeights[i].address}`, "SignerWeight" : accountsAndWeights[i].weight } });
+  }
+
+  var signer_list_set_tx = {
+    "TransactionType": "SignerListSet",
+    "Account": account.address,
+    "Flags": 0,
+    "SignerQuorum": quorum,
+    "SignerEntries"  : signers
+  };
+
+  try {
+
+    let result = await sendSignedPayload(client, account.seed, signer_list_set_tx);
+
+    if (result.result.meta.TransactionResult != "tesSUCCESS") {
+      console.log(`Could not set signer entries on account ${account.address}`);
+      console.log(`${result.result.meta.TransactionResult}`);
+    } else {
+      console.log(`Signers added to ${account.address} : ${JSON.stringify(accountsAndWeights)}`);
+    }
+
+    return result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+
 var fundThisWallet = async function(client, wallet, amountToSend) {
 
   if (isNumber(amountToSend)) {
@@ -1100,7 +1272,14 @@ module.exports = {
   generateWallets: generateWallets,
   getWalletFromSeed : getWalletFromSeed,
   generateWallet: generateWallet,
-  parseCurrencyCode: parseCurrencyCode
-
+  parseCurrencyCode: parseCurrencyCode,
+  setRegularKeyOnaccount: setRegularKeyOnaccount,
+  sendXrpToaccount: sendXrpToaccount,
+  removeRegularKeyOnaccount: removeRegularKeyOnaccount,
+  disableAccountMasterKeyPair: disableAccountMasterKeyPair,
+  enableAccountMasterKeyPair : enableAccountMasterKeyPair,
+  setAccountMultiSignerList: setAccountMultiSignerList,
+  prepareTx: prepareTx,
+  signFor: signFor
 };
 
