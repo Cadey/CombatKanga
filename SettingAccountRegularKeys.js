@@ -44,7 +44,7 @@ async function SettingAccountRegularKeys() {
     let signingAccount = await ckTools.generateWallet(client);
 
     let receiverAccount = await ckTools.generateWallet(client);
-
+   
     // Set the regular key
     await ckTools.setRegularKeyOnaccount(client, mainAccount, signingAccount);
 

@@ -1061,6 +1061,90 @@ var setAccountMultiSignerList = async function(client, account, quorum, accounts
 
 }
 
+var getTokenPath = async function(client, account, amountToReceive, sourceIssuer, sourceCurrencyId, destinationIssuer, destinationCurrencyId) {
+
+  let getTokenPath = {
+    "id": 1,
+    "command": "ripple_path_find",
+    "source_account": account, 
+    "destination_account": account,
+    "destination_amount": {
+      "currency": destinationCurrencyId, 
+      "value": amountToReceive,      
+      "issuer": destinationIssuer 
+    },
+    "source_currencies": [
+      {
+        "currency": sourceCurrencyId,  
+        "issuer": sourceIssuer  
+      }
+    ]
+  };
+
+  try {
+
+    let response = await client.request(getTokenPath);
+
+    if (response.result.status != "success") {
+      console.log(`Could not get the pathway between ${sourceIssuer}:${sourceCurrencyId} and ${destinationIssuer}:${destinationCurrencyId} `);
+      console.log(`${response.result.status}`);
+    } 
+
+    return response;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+var getBookOffers = async function(client, sourceIssuer, sourceCurrencyId, destinationIssuer, destinationCurrencyId) {
+
+  if (!destinationIssuer) {
+    destinationCurrencyId = "XRP"
+  }
+  if (!sourceIssuer) {
+    sourceCurrencyId = "XRP"
+  }
+
+  let getBookOffers = {
+    "command": "book_offers",
+    "taker_pays": {
+      "currency": sourceCurrencyId,
+    },
+    "taker_gets": {
+      "currency": destinationCurrencyId,
+    }
+  }
+
+  if (destinationIssuer) {
+    getBookOffers.taker_gets["issuer"] = destinationIssuer
+  }
+  if (sourceIssuer) {
+    getBookOffers.taker_pays["issuer"] = sourceIssuer
+  }
+
+  try {
+
+    let response = await client.request(getBookOffers);
+
+    if (!response.result) {
+      console.log(`Could not get book offers for ${sourceIssuer}:${sourceCurrencyId} and ${destinationIssuer}:${destinationCurrencyId} `);
+    } 
+
+    return response.result;
+
+  }
+  catch (e) {
+      console.log(`${e}`);
+      return;
+  }
+
+}
+
+
+
 var fundThisWallet = async function(client, wallet, amountToSend) {
 
   if (isNumber(amountToSend)) {
@@ -1238,7 +1322,7 @@ module.exports = {
   utf8ToHex: utf8ToHex,
   hexToUtf8: hexToUtf8,
   getClientAsync: async function(server) {
-    const client = new xrpl.Client(server ?? 'wss://xrpl.link');
+    const client = new xrpl.Client(server ?? 'wss://s1.ripple.com');
     await client.connect();
     return client;
   },
@@ -1280,6 +1364,8 @@ module.exports = {
   enableAccountMasterKeyPair : enableAccountMasterKeyPair,
   setAccountMultiSignerList: setAccountMultiSignerList,
   prepareTx: prepareTx,
-  signFor: signFor
+  signFor: signFor,
+  getTokenPath: getTokenPath,
+  getBookOffers: getBookOffers
 };
 
