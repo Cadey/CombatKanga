@@ -62,7 +62,7 @@ async function ManageAccountMasterKey() {
     // Sending the XRP will now work again.
     await ckTools.sendXrpToaccount(client, mainAccount, receiverAccount.address, 10);
 
-    process.exit(1);
+    process.exit(0);
 }
 
 // Init

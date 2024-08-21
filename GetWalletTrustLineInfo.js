@@ -52,7 +52,7 @@ async function GetWalletTrustLineInfo() {
     // Write them to a file
     //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTrustlineInfo, null, 2));
 
-    process.exit(1);
+    process.exit(0);
 }
 
 // Init

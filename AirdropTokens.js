@@ -64,7 +64,7 @@ async function airdropTokens() {
     // Write them to a file
     //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(results, null, 2));
 
-    process.exit(1);
+    process.exit(0);
 }
 function addAmount(account, amount, currencyCode, issuerAccount) {
     amounts.push({ account: account, amount: amount, currencyCode: currencyCode, issuerAccount: issuerAccount });

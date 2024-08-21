@@ -71,7 +71,7 @@ async function SetupNftPlayground() {
     // Create a bunch of buy and sell offer scenarios, including results like un-funded offers and orphened offers.
     await BuyAndSellNfts(client, accounts, nftCollection.nfts);
 
-    process.exit(1);
+    process.exit(0);
 
 
 }

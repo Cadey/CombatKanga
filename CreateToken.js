@@ -88,7 +88,7 @@ async function GenerateTokenAndDistribute() {
         i++;
     }
 
-    process.exit(1);
+    process.exit(0);
 }
 
 // Init

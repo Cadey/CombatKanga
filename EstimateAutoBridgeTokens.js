@@ -59,7 +59,7 @@ async function EstimateAutoBridgeTokens() {
 
     console.log(`Estimated ${toXrplValue(totalXpm)} ${destinationCurrencyId} from ${toXrplValue(totalXrp)} XRP`)
 
-    process.exit(1);
+    process.exit(0);
 
 }
 function GetEstimatedTotalDestinationToken(offers, amountToSell, sourceCurrencyId, targetCurrencyId) {

@@ -57,7 +57,7 @@ async function SettingAccountRegularKeys() {
     // This will fail to send using the newly added Regular Key
     await ckTools.sendXrpToaccount(client, mainAccount, receiverAccount.address, 10, signingAccount.seed);
 
-    process.exit(1);
+    process.exit(0);
 }
 
 // Init
