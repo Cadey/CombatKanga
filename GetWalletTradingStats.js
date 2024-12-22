@@ -35,7 +35,7 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const account = "[walletId]"; // walletId
+const account = "[Wallet_R_Address]"; // walletId
 const oldest = Date.parse('01 Sep 2021 00:00:00 UTC'); // How far to look back
 const currencyCode = "XYZ";
 

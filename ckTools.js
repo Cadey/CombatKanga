@@ -88,6 +88,86 @@ var getDateTimeFromRippleTime = function(rippleTime) {
   return new Date((rippleTimeOffSet + rippleTime) * 1000);
 
 }
+
+var getInboundAndOutboundPayments = (account, transactions) => {
+  const wallets = {};
+
+  const getOrCreateWallet = (walletAccount) => {
+
+    if (!wallets[walletAccount]) {
+      wallets[walletAccount] = {
+        account: walletAccount,
+        incommingAmounts: [],
+        outgoingAmounts: [],
+        incommingTotals: {},
+        outgoingTotals: {}
+      };
+    }
+
+    return wallets[walletAccount];
+  };
+
+  const updateTotals = (totals, amount) => {
+
+    const currencyKey = `${amount.currency}${amount.issuer ? `_${amount.issuer}` : ""}`;
+
+    if (totals[currencyKey]) {
+      totals[currencyKey].amount += parseFloat(amount.value);
+    } else {
+      totals[currencyKey] = { currency: currencyKey, amount: parseFloat(amount.value) };
+    }
+
+  };
+
+  const normalizeAmount = (deliveredAmount, txDate, txHash) => {
+
+    let amount;
+
+    if (deliveredAmount.currency) {
+      amount = {
+        ...deliveredAmount,
+        currency: deliveredAmount.currency.length > 3 
+          ? hexToUtf8(deliveredAmount.currency).replace(/\u0000+$/, "") 
+          : deliveredAmount.currency
+      };
+    } else {
+      amount = { currency: "XRP", issuer: "", value: xrpl.dropsToXrp(deliveredAmount) };
+    }
+    
+    return { ...amount, date: getDateTimeFromRippleTime(txDate), hash: txHash };
+
+  };
+
+  transactions.forEach((transaction) => {
+    if (!transaction.validated || transaction.tx.TransactionType !== tt_payment) {
+      return;
+    }
+
+    const { tx, meta } = transaction;
+    const amount = normalizeAmount(meta.delivered_amount, tx.date, tx.hash);
+    const isIncomming = tx.Account !== account;
+    const altAccount = isIncomming ? tx.Account : `${tx.Destination}${tx.DestinationTag ? `_${tx.DestinationTag}` : ""}`;
+    const wallet = getOrCreateWallet(altAccount);
+
+    if (isIncomming) {
+      wallet.incommingAmounts.push(amount);
+      updateTotals(wallet.incommingTotals, amount);
+    } else {
+      wallet.outgoingAmounts.push(amount);
+      updateTotals(wallet.outgoingTotals, amount);
+    }
+  });
+
+  return Object.values(wallets).map(wallet => {
+
+    wallet.incommingTotals = Object.values(wallet.incommingTotals);
+    wallet.outgoingTotals = Object.values(wallet.outgoingTotals);
+    
+    return wallet;
+  });
+
+};
+
 var getWalletTradingStats = function(account, accountTx, currencyId, issuer, currentBalance) {
 
   let totalPurchased = 0;
@@ -1366,6 +1446,7 @@ module.exports = {
   prepareTx: prepareTx,
   signFor: signFor,
   getTokenPath: getTokenPath,
-  getBookOffers: getBookOffers
+  getBookOffers: getBookOffers,
+  getInboundAndOutboundPayments: getInboundAndOutboundPayments
 };
 

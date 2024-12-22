@@ -36,9 +36,9 @@ const fs = require('fs');
 var ckTools = require('./ckTools');
 
 const network_server = 'wss://s.altnet.rippletest.net:51233';
-const hot_wallet_seed = '';
-const cold_wallet_seed = '';
-const currency_code = 'XYZ';
+const hot_wallet_seed = '[Wallet_R_Address]';
+const cold_wallet_seed = '[Wallet_R_Address]';
+const currency_code = '[Currency]';
 const total_supply = 1000000000;
 const total_wallets = 25;
 const fund_xrp_amount = 500;

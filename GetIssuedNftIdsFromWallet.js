@@ -36,7 +36,7 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const account = "[walletId]"; 
+const account = "[Wallet_R_Address]"; 
 const oldest = Date.parse('01 Dec 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods

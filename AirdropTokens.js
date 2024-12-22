@@ -35,10 +35,10 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const fromAccount = "[walletId]"; // Sending wallet 
-const accountSeed = "[walletSeed]"; // Seed of sending wallet
-const currencyCode = "XYZ"; // Currency to send E.g XRP, xSPECTAR
-const issuerAccount = "[walletId]"; // Issuer wallet, required if currency is NOT XRP
+const fromAccount = "[Wallet_R_Address]"; // Sending wallet 
+const accountSeed = "[wallet_Seed]"; // Seed of sending wallet
+const currencyCode = "[Currency]"; // Currency to send E.g XRP, xSPECTAR
+const issuerAccount = "[Wallet_R_Address]"; // Issuer wallet, required if currency is NOT XRP
 const memoText = "" // Memo for the transaction E.g July ambassador rewards
 let amounts = [];
 

@@ -35,7 +35,7 @@
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
-const account = "[walletId]";
+const account = "[Wallet_R_Address]";
 
 // Private methods
 async function GetWalletNfts() {

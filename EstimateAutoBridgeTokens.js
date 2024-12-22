@@ -36,10 +36,10 @@ const BigNumber = require('bignumber.js');
 // Private variables
 var ckTools = require('./ckTools');
 
-const sourceCurrencyId = "XKF";
-const sourceIssuer = "rG6RZ93xFrgCcXhWdh2hAWDeDwydMvS19J";
-const destinationCurrencyId = "XPM";
-const destinationIssuer = "rXPMxBeefHGxx2K7g5qmmWq3gFsgawkoa";
+const sourceCurrencyId = "[Currency]";
+const sourceIssuer = "[Wallet_R_Address]";
+const destinationCurrencyId = "[Currency]";
+const destinationIssuer = "[Wallet_R_Address]";
 const amountToSell = 1000;
 
 const DECIMAL_PLACES = 15;

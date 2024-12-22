@@ -35,8 +35,8 @@
 var ckTools = require('./ckTools');
 var fromExponential = require('from-exponential');
 
-const currencyId = "784B616E67614D4B310000000000000000000000";
-const issuer = "rPwdrA6YFGR6k5rPyT6QPx7MrQAavUtyz5";
+const currencyId = "[Wallet_R_Address]";
+const issuer = "[Wallet_R_Address]";
 const maxAccountsToShow = 100; // or max with Number.MAX_SAFE_INTEGER
 const minBalance = 0.00000001;
 
