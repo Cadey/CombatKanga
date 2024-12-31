@@ -126,9 +126,7 @@ var getInboundAndOutboundPayments = (account, transactions) => {
     if (deliveredAmount.currency) {
       amount = {
         ...deliveredAmount,
-        currency: deliveredAmount.currency.length > 3 
-          ? hexToUtf8(deliveredAmount.currency).replace(/\u0000+$/, "") 
-          : deliveredAmount.currency
+        currency: getCurrencySymbol(deliveredAmount.currency)
       };
     } else {
       amount = { currency: "XRP", issuer: "", value: xrpl.dropsToXrp(deliveredAmount) };
@@ -907,7 +905,7 @@ var disableAccountMasterKeyPair = async function(client, wallet) {
     "SetFlag": xrpl.AccountSetAsfFlags.asfDisableMaster
   }
 
-  try {
+  try {  
 
     let result = await sendSignedPayload(client, wallet.seed, disable_master_tx);
 
@@ -960,19 +958,19 @@ var createTrustLine = async function(client, wallet, issuerAccount, currencyCode
   if (isNumber(totalFor)) {
     totalFor = `${totalFor}`;
   }
+ 
+    var wallet_trust_set_tx = {
+        "TransactionType": "TrustSet",
+        "Account": wallet.address,
+        "Flags": 131072,
+        "LimitAmount": {
+            "currency": currency_code_hex,
+            "issuer": issuerAccount,
+            "value": totalFor
+        }
+    }
 
-  var wallet_trust_set_tx = {
-      "TransactionType": "TrustSet",
-      "Account": wallet.address,
-      "Flags": 131072,
-      "LimitAmount": {
-          "currency": currency_code_hex,
-          "issuer": issuerAccount,
-          "value": totalFor
-      }
-  }
-
-  try {
+    try {
 
     let result = await sendSignedPayload(client, wallet.seed, wallet_trust_set_tx);
 
@@ -1120,7 +1118,7 @@ var setAccountMultiSignerList = async function(client, account, quorum, accounts
     "SignerEntries"  : signers
   };
 
-  try {
+   try {
 
     let result = await sendSignedPayload(client, account.seed, signer_list_set_tx);
 
@@ -1294,6 +1292,148 @@ var parseCurrencyCode = function(currencyCode) {
 
 var rippleTime = () => new Date(Date.parse("1/1/2000 00:00:00Z")).getTime();
 
+var analiseTrades = function (transactions) {
+
+  const offersAndTrades = transactions
+    .filter(tx => tx.tx.TransactionType === "OfferCreate")
+    .map(tx => ({
+        offer: tx,
+        transactions: [],
+        data: {}
+    }));
+
+  const cancelledOffers = transactions.filter(tx => tx.tx.TransactionType === "OfferCancel");
+
+  const offerTransactions = transactions.filter(tx => {
+      if (tx.tx.TransactionType !== "OfferCreate") return false;
+
+      const nodes = tx.meta.AffectedNodes || [];
+      return nodes.some(node => {
+          const modifiedNode = node.ModifiedNode || node.DeletedNode;
+          return (
+              modifiedNode &&
+              modifiedNode.LedgerEntryType === 'Offer' &&
+              modifiedNode.FinalFields
+          );
+      });
+  });
+
+  offersAndTrades.forEach(e => {
+      e.transactions = offerTransactions.filter(
+          e2 => e2.tx.OfferSequence === e.offer.tx.Sequence || e2.tx.Sequence === e.offer.tx.Sequence
+      );
+  });
+
+  offersAndTrades.forEach(e => {
+
+    e.data.buyingCurrency = getCurrencySymbol(e.offer.tx.TakerPays.currency ? e.offer.tx.TakerPays.currency : "xrp");
+    e.data.buyingAmount = e.offer.tx.TakerPays.currency ?  e.offer.tx.TakerPays.value : xrpl.dropsToXrp(e.offer.tx.TakerPays);
+    e.data.sellingCurrency = getCurrencySymbol(e.offer.tx.TakerGets.currency ? e.offer.tx.TakerGets.currency : "xrp");
+    e.data.sellingAmount = e.offer.tx.TakerGets.currency ?  e.offer.tx.TakerGets.value : xrpl.dropsToXrp(e.offer.tx.TakerGets);
+    e.data.sellingRate = e.data.buyingAmount / e.data.sellingAmount; 
+    e.data.buyingRate = e.data.sellingAmount / e.data.buyingAmount;
+    e.data.trades = [];
+
+    e.transactions.forEach(t => {
+
+      if (!t.meta.AffectedNodes) {
+        return;
+      }
+
+      const trades = t.meta.AffectedNodes.filter(t2 => {
+          const node = t2.ModifiedNode || t2.DeletedNode;
+          if (!node) return false;
+      
+          return ["Offer", "AccountRoot", "RippleState"].includes(node.LedgerEntryType);
+      });
+
+      const offers = trades.filter(tx => {
+          const node = tx.ModifiedNode || tx.DeletedNode;
+          return node?.LedgerEntryType === "Offer";
+      });
+
+      offers.forEach(tx => {
+
+        const  node = tx.ModifiedNode || tx.DeletedNode
+        if (!node?.PreviousFields || node?.LedgerEntryType === "AccountRoot") return;
+
+        const trade = {
+          account: node.FinalFields.Account,
+          buying: tradeDelta(node, "TakerPays"),
+          selling: tradeDelta(node, "TakerGets")
+        };
+
+        const soldAmount = trade.selling.previousAmount - trade.selling.finalAmount;
+        const purchasedAmount = trade.buying.finalAmount - trade.buying.previousAmount;
+
+        trade.sellingRate = purchasedAmount / soldAmount;
+        trade.buyingRate = soldAmount / purchasedAmount;
+
+        e.data.trades.push(trade);
+
+      })
+
+      const ammRippledTrades = trades.filter(tx => {
+          const node = tx.ModifiedNode || tx.DeletedNode;
+          return node?.LedgerEntryType === "AccountRoot" && node?.FinalFields?.AMMID;
+      });
+      
+      ammRippledTrades.forEach(tx => {
+
+        const node = tx.ModifiedNode || tx.DeletedNode;
+
+        if (!node) return;
+
+        const account = node.FinalFields.Account;
+
+        const rippleState = trades.find(tx => {   
+          const node = tx.ModifiedNode || tx.DeletedNode 
+          return node.LedgerEntryType == "RippleState" && node.FinalFields.HighLimit.issuer == account
+        });
+
+        if (!rippleState) {
+          return;
+        }
+
+        const rsNode = rippleState.ModifiedNode || rippleState.DeletedNode;
+        const trade = {
+          account: account,
+          buying: {
+            currency: getCurrencySymbol(rsNode.FinalFields.LowLimit.currency ?  rsNode.FinalFields.LowLimit.currency : "xrp"),
+            finalAmount: rsNode.FinalFields.Balance.currency ?  rsNode.FinalFields.Balance.value : xrpl.dropsToXrp(rsNode.FinalFields.Balance),
+            previousAmount: rsNode.PreviousFields.Balance.currency ?  rsNode.PreviousFields.Balance.value : xrpl.dropsToXrp(rsNode.PreviousFields.Balance)
+          },
+          selling: tradeDelta(node, "Balance")
+        };
+
+        const soldAmount = trade.selling.previousAmount - trade.selling.finalAmount;
+        const purchasedAmount = trade.buying.previousAmount - trade.buying.finalAmount;
+
+        trade.sellingRate = soldAmount / purchasedAmount;
+        trade.buyingRate = purchasedAmount / soldAmount;
+
+        e.data.trades.push(trade);
+
+      })
+
+    })
+
+    e.data.totalPurchased = 0;
+    e.data.totalSold = 0;
+
+    e.data.trades.forEach(e2 => {
+      e.data.totalPurchased += e2.selling.finalAmount - e2.selling.previousAmount
+      e.data.totalSold  += e2.buying.previousAmount - e2.buying.finalAmount 
+    })
+
+    e.data.finalSellingRate =  e.data.totalPurchased / e.data.totalSold;
+    e.data.finalBuyingRate = e.data.totalSold / e.data.totalPurchased;
+
+  })
+
+  return offersAndTrades;
+
+}
 
 // Private methods
 function checkMinBalance(minBalance) {
@@ -1364,7 +1504,7 @@ function getCurrencySymbol(currency) {
   for (var i = 0; i < currency.length; i += 2)
     symbol += String.fromCharCode(parseInt(currency.substr(i, 2), 16));
 
-  return symbol;
+  return symbol.replace(/\u0000+$/, "");
 
 }
 function getTrustLineDate(AffectedNodes, txDate, issuer) {
@@ -1391,6 +1531,24 @@ function pad(pad, str, padLeft) {
   }
 }
 function XrpBalanceToDrops(amount) { return (amount * 1000000) }
+
+function tradeDelta(node, feild) {
+
+  
+  try{
+    const data = {
+      currency: !node.FinalFields[feild] ? "n/a" : getCurrencySymbol(node.FinalFields[feild].currency ? node.FinalFields[feild].currency : "xrp"),
+      finalAmount: !node.FinalFields[feild] ? 0 : node.FinalFields[feild].currency ?  node.FinalFields[feild].value : xrpl.dropsToXrp(node.FinalFields[feild]),
+      previousAmount: !node.PreviousFields[feild] ? 0 : node.PreviousFields[feild].currency ?  node.PreviousFields[feild].value : xrpl.dropsToXrp(node.PreviousFields[feild]),
+    }
+
+    return data;
+
+  } catch (e) {
+    console.log(`${e}`);
+  }
+
+}
 
 
 // Public module
@@ -1447,6 +1605,7 @@ module.exports = {
   signFor: signFor,
   getTokenPath: getTokenPath,
   getBookOffers: getBookOffers,
-  getInboundAndOutboundPayments: getInboundAndOutboundPayments
+  getInboundAndOutboundPayments: getInboundAndOutboundPayments,
+  analiseTrades: analiseTrades
 };
 
