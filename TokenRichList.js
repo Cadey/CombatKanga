@@ -34,6 +34,7 @@
 // Private variables
 var ckTools = require('./ckTools');
 var fromExponential = require('from-exponential');
+const fs = require('fs');
 
 const currencyId = "[Wallet_R_Address]";
 const issuer = "[Wallet_R_Address]";
@@ -43,18 +44,38 @@ const minBalance = 0.00000001;
 // Private methods
 async function tokenRichList() {
 
+    // 1) Retrieve all trust lines
     let client = await ckTools.getClientAsync();
     let trustLines = await ckTools.getAllTrustLinesAsync(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
-
+    
+    // 2) Convert balances to positive numbers and sort descending
     trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
     trustLines = trustLines.sort((a, b) => b.balance - a.balance);
 
+    //    NOTE:    Steps 3, 5 & 6 are optional for exporting results to file instead of in terminal only.
+    //             If you just want to see the results in the terminal, comment them out or delete them.
+    //    3) Limit to the top `maxAccountsToShow` 
+    //    using `.slice()` here so we don't mutate `trustLines`.
+    const topTrustLines = trustLines.slice(0, maxAccountsToShow);
+
+    // 4) Log the results in the terminal
     trustLines.splice(0, maxAccountsToShow).forEach((trustline) => {
         console.log(`Wallet:  ${trustline.account} - Balance: ${trustline.balance}`)
     });
 
-    // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
+    // 5) Transform the results into JSON arrays in the following format:
+    // [{ 
+    //    Wallet: "rABC...", 
+    //    Balance: 123 
+    // }, ...]
+    const formattedData = topTrustLines.map((trustline) => ({
+        Wallet: trustline.account,
+        Balance: trustline.balance
+      }));
+
+    // 6) Write the results to a JSON file. 
+    // Make sure to change [Some://File/Path] to your desired file name!
+    fs.writeFileSync('[Some://File/Path]', JSON.stringify(formattedData, null, 2));
 
     process.exit(0);
 }
