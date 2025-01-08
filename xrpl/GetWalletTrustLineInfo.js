@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,28 +26,34 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
+
 
 //Imports
 const fs = require('fs');
 var ckTools = require('./ckTools');
 
+const currencyCode = "XYZ";
+const issuer = "[Wallet_R_Address]";
 const account = "[Wallet_R_Address]";
+const oldest = Date.parse('01 Oct 2021 00:00:00 UTC'); // How far to look back
 
 // Private methods
-async function GetWalletNfts() {
+async function GetWalletTrustLineInfo() {
 
     let client = await ckTools.getClientAsync();
-    let walletNfts = await ckTools.getAllCurrentNftsAsync(client, account);
+    let transactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
+
+    let walletTrustlineInfo = ckTools.getWalletTrustLineInfo(account, transactions, issuer, ckTools.parseCurrencyCode(currencyCode));
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletNfts, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletTrustlineInfo, null, 2));
 
     process.exit(0);
 }
 
 // Init
-GetWalletNfts();
+GetWalletTrustLineInfo();

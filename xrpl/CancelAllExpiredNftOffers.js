@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
@@ -34,20 +34,23 @@
 //Imports
 const fs = require('fs');
 var ckTools = require('./ckTools');
-const account = "[walletId]";
-const minBalance = { currencyId: ckTools.parseCurrencyCode('XYZ'), balance: 1 };
-const maxTrustLinesToGet = undefined;
+
+const cancelBatchSize = 25;
+const account = "[Wallet_R_Address]"; // walletId
+const accountSeed = "[Wallet_Seed]"; // seed for waller that owns the offer
+const oldest = Date.parse('01 Dec 2022 00:00:00 UTC'); // How far to look back
 
 // Private methods
-async function GetWalletTrustLineInfo() {
+async function cancelAllExpiredNftOffers() {
 
-    let client = await ckTools.getClientAsync();
-    let trustLines = await ckTools.getAllTrustLinesAsync(client, account, maxTrustLinesToGet, minBalance);
+    let client = await ckTools.getClientAsync('wss://xrplcluster.com');
+    let results = await ckTools.findAndCancelExpiredNftOffers(client, account, oldest, accountSeed, cancelBatchSize);
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(results, null, 2));
+
     process.exit(0);
 }
 
 // Init
-GetWalletTrustLineInfo();
+cancelAllExpiredNftOffers();

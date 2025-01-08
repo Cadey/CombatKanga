@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,38 +26,28 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
 
-// Private variables
+//Imports
+const fs = require('fs');
 var ckTools = require('./ckTools');
-var fromExponential = require('from-exponential');
 
-const currencyId = "[Wallet_R_Address]";
-const issuer = "[Wallet_R_Address]";
-const maxAccountsToShow = 100; // or max with Number.MAX_SAFE_INTEGER
-const minBalance = 0.00000001;
+const account = "[Wallet_R_Address]";
 
 // Private methods
-async function tokenRichList() {
+async function GetWalletNfts() {
 
     let client = await ckTools.getClientAsync();
-    let trustLines = await ckTools.getAllTrustLinesAsync(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
-
-    trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
-    trustLines = trustLines.sort((a, b) => b.balance - a.balance);
-
-    trustLines.splice(0, maxAccountsToShow).forEach((trustline) => {
-        console.log(`Wallet:  ${trustline.account} - Balance: ${trustline.balance}`)
-    });
+    let walletNfts = await ckTools.getAllCurrentNftsAsync(client, account);
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(walletNfts, null, 2));
 
     process.exit(0);
 }
 
 // Init
-tokenRichList();
+GetWalletNfts();

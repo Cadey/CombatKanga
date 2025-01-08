@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "bignumber": "^1.1.0",
+    "from-exponential": "^1.1.1",
+    "mathjs": "^10.0.0",
+    "mssql": "^8.1.1",
+    "xrpl": "^2.13.0",
+    "axios" : "1.7.9"
+  }
+}

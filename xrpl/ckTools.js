@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
@@ -1292,8 +1292,9 @@ var parseCurrencyCode = function(currencyCode) {
 
 var rippleTime = () => new Date(Date.parse("1/1/2000 00:00:00Z")).getTime();
 
-var analiseTrades = function (transactions) {
+var analiseTradesOld = function (transactions) {
 
+  
   const offersAndTrades = transactions
     .filter(tx => tx.tx.TransactionType === "OfferCreate")
     .map(tx => ({
@@ -1304,6 +1305,7 @@ var analiseTrades = function (transactions) {
 
   const cancelledOffers = transactions.filter(tx => tx.tx.TransactionType === "OfferCancel");
 
+  
   const offerTransactions = transactions.filter(tx => {
       if (tx.tx.TransactionType !== "OfferCreate") return false;
 
@@ -1433,6 +1435,113 @@ var analiseTrades = function (transactions) {
 
   return offersAndTrades;
 
+}
+
+var analiseTrades = function(transactions, account) {
+
+
+  const CreatedOffers = transactions
+    .filter(tx => tx.tx.TransactionType === "OfferCreate" && tx.tx.Account == account)
+    .map(tx => ({
+        offer: tx,
+        trades: [],
+        ripples: []
+    }));
+
+    const getTradesFromOffer = (transactions) => {
+      return transactions
+        .filter(tx => tx.tx.TransactionType !== "OfferCancel")
+        .flatMap(tx => {
+          const affectedNodes = tx.meta?.AffectedNodes || [];
+
+          const nodes = affectedNodes.filter(node => {
+
+            let nodeType = node["ModifiedNode"] ? "ModifiedNode" : node["DeletedNode"] ? "DeletedNode" : "?";
+
+            if (nodeType === "?") {
+              return false;
+            }
+
+            node["NodeType"] = nodeType;
+            return node[nodeType].LedgerEntryType === "Offer" && node[nodeType].FinalFields && node[nodeType].PreviousFields;
+          
+          });
+    
+          return nodes
+            .map(node => {
+
+            const nodeType = node.ModifiedNode || node.DeletedNode
+
+            const buying = tradeDelta(nodeType, "TakerPays");
+            const selling = tradeDelta(nodeType, "TakerGets");
+
+            if (!selling) {
+              console.log("");
+            }
+
+            const soldAmount = selling.previousAmount - selling.finalAmount;
+            const purchasedAmount = buying.finalAmount - buying.previousAmount;
+
+            return {
+              transactionHash: tx.tx.hash,
+              account: nodeType.FinalFields.Account,
+              offerSequence:  nodeType.FinalFields.Sequence,
+              buying: buying,
+              buyingRate : (soldAmount / purchasedAmount) * -1,
+              selling: selling,
+              sellingRate : (purchasedAmount / soldAmount) * -1,
+            }
+          })
+        });
+    };
+    const trades = getTradesFromOffer(transactions);
+  
+
+    CreatedOffers.forEach(co => {
+
+      co.trades = trades.filter(t => t.offerSequence === co.offer.tx.Sequence);
+
+      var meta = co.offer.meta;
+      var rippleChanage = meta.AffectedNodes.find(node => {
+        const nodeType = node["ModifiedNode"] || node["DeletedNode"];
+        return (nodeType && nodeType.LedgerEntryType == "RippleState" && nodeType.FinalFields.HighLimit.issuer == account) 
+      });
+
+      if (!rippleChanage) {
+        return;
+      }
+
+      var accountChange = meta.AffectedNodes.find(node => {
+        const nodeType = node["ModifiedNode"] || node["DeletedNode"];
+        return (nodeType && nodeType.LedgerEntryType == "AccountRoot" && nodeType.FinalFields && nodeType.FinalFields.Account == account && nodeType.PreviousFields.Sequence == co.offer.tx.Sequence) 
+      });
+
+      const rippleNodeType = rippleChanage["ModifiedNode"] || rippleChanage["DeletedNode"];
+
+      let currencyBalanceChanged = (rippleNodeType.FinalFields.Balance.value - rippleNodeType.PreviousFields.Balance.value) * -1;
+      let xrpBalanceChanged = xrpl.dropsToXrp(parseFloat(accountChange.ModifiedNode.FinalFields.Balance) - parseFloat(accountChange.ModifiedNode.PreviousFields.Balance));
+
+      co.ripples.push({
+        currency: getCurrencySymbol(rippleNodeType.PreviousFields.Balance.currency),
+        currencyIssuer: rippleNodeType.FinalFields.Balance.issuer,
+        currencyBalanceChanged: currencyBalanceChanged,
+        xrpBalanceChanged: xrpBalanceChanged,
+        currencyRate: (currencyBalanceChanged / xrpBalanceChanged) * -1,
+        xrpRate: (xrpBalanceChanged / currencyBalanceChanged)* -1
+      })
+
+    })
+
+    const cancelledOffers = transactions
+    .filter(tx => tx.tx.TransactionType === "OfferCancel" && tx.tx.Account == account)
+    .map(tx => ({
+        offer: tx,
+        trades: [],
+        ripples: {}
+    }));
+    
+    const activeOffers = CreatedOffers.filter(e => e.ripples.length > 0 || e.trades.length > 0)
+ 
 }
 
 // Private methods

@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,35 +26,38 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
 
-//Imports
-const fs = require('fs');
+// Private variables
 var ckTools = require('./ckTools');
+var fromExponential = require('from-exponential');
 
-const account = "[Wallet_R_Address]"; // walletId
-const oldest = Date.parse('01 Sep 2021 00:00:00 UTC'); // How far to look back
-const currencyCode = "XYZ";
+const currencyId = "[Wallet_R_Address]";
+const issuer = "[Wallet_R_Address]";
+const maxAccountsToShow = 100; // or max with Number.MAX_SAFE_INTEGER
+const minBalance = 0.00000001;
 
 // Private methods
-async function GetWalletTradingStats() {
+async function tokenRichList() {
 
     let client = await ckTools.getClientAsync();
-    let balances = await ckTools.getAccountLinessAsync(client, account);
-    let walletTransactions = await ckTools.getWalletTransactionsAsync(client, account, oldest);
+    let trustLines = await ckTools.getAllTrustLinesAsync(client, issuer, Number.MAX_SAFE_INTEGER, { amount: minBalance, currencyId: currencyId});
 
-    let currecyId = ckTools.parseCurrencyCode(currencyCode);
-    let balance = balances.filter(e => e.currencyId == currecyId);
-    let stats = ckTools.getWalletTradingStats(account, walletTransactions, currecyId);
+    trustLines.forEach((trustline) => trustline.balance = ckTools.toPositiveBalance(trustline.balance));
+    trustLines = trustLines.sort((a, b) => b.balance - a.balance);
+
+    trustLines.splice(0, maxAccountsToShow).forEach((trustline) => {
+        console.log(`Wallet:  ${trustline.account} - Balance: ${trustline.balance}`)
+    });
 
     // Write them to a file
-    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify({ Balance: balance, TradingStats: stats }, null, 2));
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
 
     process.exit(0);
 }
 
 // Init
-GetWalletTradingStats();
+tokenRichList();

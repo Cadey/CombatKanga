@@ -1,4 +1,4 @@
-//  Copyright 2024 CombatKanga Ltd (Company number 13709049)
+//  Copyright 2025 CombatKanga Ltd (Company number 13709049)
 //  
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -26,44 +26,28 @@
 //
 //  A collection of useful functions to help navigate the XRPL (Ripple XRP SDK)  
 //
-//  If you want help using the XRPL.js libary or want us to add ant more functions
+//  If you want help using the XRPL.js libary or Bitcoin or want us to add ant more functions
 //  please get in contact with us at [[support@combatkanga.com]]
 //
 //
 
 //Imports
+const fs = require('fs');
 var ckTools = require('./ckTools');
-const network_server = 'wss://s.altnet.rippletest.net:51233';
+const account = "[walletId]";
+const minBalance = { currencyId: ckTools.parseCurrencyCode('XYZ'), balance: 1 };
+const maxTrustLinesToGet = undefined;
 
 // Private methods
-async function ManageAccountMasterKey() {
+async function GetWalletTrustLineInfo() {
 
-    let client = await ckTools.getClientAsync(network_server);
+    let client = await ckTools.getClientAsync();
+    let trustLines = await ckTools.getAllTrustLinesAsync(client, account, maxTrustLinesToGet, minBalance);
 
-    let mainAccount = await ckTools.generateWallet(client);
-    let signingAccount = await ckTools.generateWallet(client);
-    let receiverAccount = await ckTools.generateWallet(client);
-
-    // Set the regular key
-    await ckTools.setRegularKeyOnaccount(client, mainAccount, signingAccount);
-
-    // Disable the master key
-    await ckTools.disableAccountMasterKeyPair(client, mainAccount);
-
-    // Sending the XRP will fail from the master key
-    await ckTools.sendXrpToaccount(client, mainAccount, receiverAccount.address, 10);
-
-    // Sending the XRP will work from the regular key
-    await ckTools.sendXrpToaccount(client, mainAccount, receiverAccount.address, 10, signingAccount.seed);
-
-    // Enable the master key
-    await ckTools.enableAccountMasterKeyPair(client, mainAccount, signingAccount.seed);
-
-    // Sending the XRP will now work again.
-    await ckTools.sendXrpToaccount(client, mainAccount, receiverAccount.address, 10);
-
+    // Write them to a file
+    //await fs.writeFileSync('[Some://File/Path]', JSON.stringify(trustLines, null, 2));
     process.exit(0);
 }
 
 // Init
-ManageAccountMasterKey();
+GetWalletTrustLineInfo();
